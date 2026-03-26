@@ -1,0 +1,28 @@
+{
+  "name": "inspecto",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloud platform for sharing Pencil .pen design files",
+  "scripts": {
+    "dev:api": "pnpm --filter @inspecto/api dev",
+    "dev:web": "pnpm --filter @inspecto/web dev",
+    "dev": "pnpm --filter @inspecto/api --filter @inspecto/web -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @inspecto/api db:migrate",
+    "db:rollback": "pnpm --filter @inspecto/api db:rollback",
+    "db:seed": "pnpm --filter @inspecto/api db:seed"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "msgpackr-extract"
+    ]
+  }
+}
