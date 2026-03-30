@@ -32,6 +32,9 @@ ENV NODE_ENV=production
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static apps/web/.next/static/
 COPY --from=build /app/apps/web/public apps/web/public/
+# @iconify/json for server-side icon API route
+COPY --from=deps /app/node_modules/.pnpm/@iconify+json@*/node_modules/@iconify/json/json apps/web/node_modules/@iconify/json/json/
+COPY --from=deps /app/node_modules/.pnpm/@iconify+json@*/node_modules/@iconify/json/package.json apps/web/node_modules/@iconify/json/
 
 WORKDIR /app/apps/web
 EXPOSE 3000

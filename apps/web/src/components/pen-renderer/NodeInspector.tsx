@@ -121,10 +121,13 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: 'var(--radius-sm)', backgroundColor: fillResolved ?? '#ccc', boxShadow: v.insetBorder, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: v.fgText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fillRaw}</div>
-              <div style={{ fontSize: 11, color: v.mutedText }}>{fillResolved} · 100%</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: v.fgText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {fillResolved ?? fillRaw}
+              </div>
+              {fillRaw.startsWith('$') && fillResolved && fillResolved !== fillRaw && (
+                <div style={{ fontSize: 11, color: v.mutedText }}>{fillRaw}</div>
+              )}
             </div>
-            <span style={{ fontSize: 14, color: v.mutedText }}>👁</span>
           </div>
         </Section>
       )}
@@ -132,11 +135,24 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
       {/* ═══ STROKE ═══ */}
       <Section>
         <SectionLabel>STROKE</SectionLabel>
-        {n.stroke ? (
-          <div style={{ fontSize: 12, color: v.fgText }}>
-            {n.stroke.align} · {JSON.stringify(n.stroke.thickness)}px · {resolver.resolveStrokeColor(n.stroke.fill) ?? 'none'}
-          </div>
-        ) : (
+        {n.stroke ? (() => {
+          const strokeRaw = typeof n.stroke.fill === 'string' ? n.stroke.fill : undefined;
+          const strokeResolved = resolver.resolveStrokeColor(n.stroke.fill);
+          const isRef = strokeRaw?.startsWith('$');
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {strokeResolved && (
+                <div style={{ width: 16, height: 16, borderRadius: 'var(--radius-sm)', backgroundColor: strokeResolved, boxShadow: v.insetBorder, flexShrink: 0 }} />
+              )}
+              <div style={{ fontSize: 12, color: v.fgText }}>
+                {n.stroke.align} · {JSON.stringify(n.stroke.thickness)}px · {strokeResolved ?? 'none'}
+              </div>
+              {isRef && strokeResolved && strokeResolved !== strokeRaw && (
+                <span style={{ fontSize: 11, color: v.mutedText }}>{strokeRaw}</span>
+              )}
+            </div>
+          );
+        })() : (
           <div style={{ fontSize: 12, fontStyle: 'italic', color: v.mutedText }}>No stroke applied</div>
         )}
       </Section>
@@ -152,7 +168,12 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
                 {n.effect.shadowType === 'inner' ? 'Inner Shadow' : 'Drop Shadow'}
               </div>
               <div style={{ fontSize: 10, color: v.mutedText }}>
-                {n.effect.offset?.x ?? 0}px {n.effect.offset?.y ?? 0}px {n.effect.blur ?? 0}px {n.effect.color ?? ''}
+                {n.effect.offset?.x ?? 0}px {n.effect.offset?.y ?? 0}px {n.effect.blur ?? 0}px {(() => {
+                  const raw = n.effect.color;
+                  if (!raw) return '';
+                  const resolved = typeof raw === 'string' && raw.startsWith('$') ? resolver.resolveColor(raw) : raw;
+                  return resolved !== raw ? `${resolved} (${raw})` : raw;
+                })()}
               </div>
             </div>
             <span style={{ fontSize: 14, color: v.mutedText }}>👁</span>
@@ -166,8 +187,8 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
       {isText && (
         <Section>
           <SectionLabel>TYPOGRAPHY</SectionLabel>
-          <TypoRow label="Font Family" value={resolver.resolveFontFamily(n.fontFamily)} />
-          <TypoRow label="Font Size" value={resolver.resolveFontSize(n.fontSize)} />
+          <TypoRow label="Font Family" value={resolver.resolveFontFamily(n.fontFamily)} ref$={typeof n.fontFamily === 'string' && n.fontFamily.startsWith('$') ? n.fontFamily : undefined} />
+          <TypoRow label="Font Size" value={resolver.resolveFontSize(n.fontSize)} ref$={typeof n.fontSize === 'string' && n.fontSize.startsWith('$') ? n.fontSize : undefined} />
           <TypoRow label="Font Weight" value={String(n.fontWeight ?? 'normal')} />
           {n.lineHeight !== undefined && <TypoRow label="Line Height" value={String(n.lineHeight)} />}
           {n.letterSpacing !== undefined && <TypoRow label="Letter Spacing" value={`${n.letterSpacing}px`} />}
@@ -178,6 +199,9 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 12, height: 12, borderRadius: 9999, backgroundColor: fillResolved, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)' }} />
                 <span style={{ fontSize: 12, fontWeight: 500, color: v.fgText }}>{fillResolved}</span>
+                {fillRaw?.startsWith('$') && fillResolved !== fillRaw && (
+                  <span style={{ fontSize: 11, color: v.mutedText }}>{fillRaw}</span>
+                )}
               </div>
             </div>
           )}
@@ -215,7 +239,7 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
       )}
 
       {/* ═══ DESIGN TOKENS ═══ */}
-      <DesignTokensSection node={n} />
+      <DesignTokensSection node={n} resolver={resolver} />
 
       {/* ═══ JSON ═══ */}
       <Section>
@@ -241,20 +265,22 @@ function InspectorContent({ node, resolver }: { node: PenChild; resolver: VarRes
 }
 
 // ═══ Design Tokens Section ═══
-function DesignTokensSection({ node }: { node: any }) {
-  const tokens: Array<{ key: string; value: string; dotColor?: string }> = []
+function DesignTokensSection({ node, resolver }: { node: any; resolver: VarResolver }) {
+  const tokens: Array<{ key: string; ref: string; resolved?: string }> = []
 
   function extractTokens(obj: any, prefix = '') {
     if (!obj || typeof obj !== 'object') {
       if (typeof obj === 'string' && obj.startsWith('$')) {
-        tokens.push({ key: prefix, value: obj })
+        const resolved = resolver.resolveColor(obj)
+        tokens.push({ key: prefix, ref: obj, resolved: resolved !== obj ? resolved : undefined })
       }
       return
     }
     for (const [k, val] of Object.entries(obj)) {
       if (k === 'id' || k === 'name' || k === 'type' || k === 'children' || k === 'content') continue
       if (typeof val === 'string' && val.startsWith('$')) {
-        tokens.push({ key: k, value: val })
+        const resolved = resolver.resolveColor(val)
+        tokens.push({ key: k, ref: val, resolved: resolved !== val ? resolved : undefined })
       } else if (typeof val === 'object' && val !== null) {
         extractTokens(val, k)
       }
@@ -268,11 +294,18 @@ function DesignTokensSection({ node }: { node: any }) {
     <Section>
       <SectionLabel>DESIGN TOKENS</SectionLabel>
       {tokens.map((t, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: 9999, backgroundColor: 'var(--color-primary)', flexShrink: 0 }} />
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24 }}>
+          {t.resolved ? (
+            <div style={{ width: 12, height: 12, borderRadius: 9999, backgroundColor: t.resolved, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)', flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 8, height: 8, borderRadius: 9999, backgroundColor: 'var(--color-primary)', flexShrink: 0, marginLeft: 2, marginRight: 2 }} />
+          )}
           <span style={{ fontSize: 12, color: v.secText }}>{t.key}</span>
           <span style={{ fontSize: 12, color: v.mutedText }}>→</span>
-          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>{t.value}</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>{t.ref}</span>
+          {t.resolved && (
+            <span style={{ fontSize: 11, color: v.mutedText, fontFamily: 'JetBrains Mono, monospace' }}>{t.resolved}</span>
+          )}
         </div>
       ))}
     </Section>
@@ -307,11 +340,14 @@ function PosField({ label, value, icon }: { label: string; value: string | numbe
   )
 }
 
-function TypoRow({ label, value }: { label: string; value: string }) {
+function TypoRow({ label, value, ref$ }: { label: string; value: string; ref$?: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
       <span style={{ fontSize: 12, color: v.secText }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 500, color: v.fgText }}>{value}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: v.fgText }}>{value}</span>
+        {ref$ && value !== ref$ && <span style={{ fontSize: 11, color: v.mutedText }}>{ref$}</span>}
+      </div>
     </div>
   )
 }
