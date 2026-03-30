@@ -12,6 +12,9 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Inspecto — Design Collaboration for Teams',
   description: 'Share, inspect & collaborate on your designs. View-only inspect mode, pixel-perfect measurements, and real-time comments.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
