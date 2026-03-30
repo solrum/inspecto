@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 // Map .pen iconFontFamily values to @iconify/json set names
 const FAMILY_MAP: Record<string, string> = {
@@ -15,19 +13,19 @@ const FAMILY_MAP: Record<string, string> = {
 // In-memory cache: family → { name → svg }
 const cache = new Map<string, Map<string, string>>();
 
-function loadIconSet(setName: string): Map<string, string> {
+async function loadIconSet(setName: string): Promise<Map<string, string>> {
   if (cache.has(setName)) return cache.get(setName)!;
 
   try {
-    const jsonPath = join(process.cwd(), 'node_modules', '@iconify', 'json', 'json', `${setName}.json`);
-    const data = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+    // Dynamic import — works with both Turbopack and standalone
+    const data = (await import(`@iconify/json/json/${setName}.json`)).default;
     const icons = new Map<string, string>();
 
-    const defaultBody = data.width ?? 24;
-    const defaultHeight = data.height ?? defaultBody;
+    const defaultWidth = data.width ?? 24;
+    const defaultHeight = data.height ?? defaultWidth;
 
     for (const [name, icon] of Object.entries(data.icons) as [string, any][]) {
-      const w = icon.width ?? defaultBody;
+      const w = icon.width ?? defaultWidth;
       const h = icon.height ?? defaultHeight;
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${icon.body}</svg>`;
       icons.set(name, svg);
@@ -49,7 +47,7 @@ export async function GET(
   const { family, name } = await params;
 
   const setName = FAMILY_MAP[family] ?? family;
-  const icons = loadIconSet(setName);
+  const icons = await loadIconSet(setName);
 
   // Strip .svg extension if present
   const iconName = name.replace(/\.svg$/, '');
