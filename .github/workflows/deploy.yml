@@ -9,13 +9,10 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
-    paths-ignore:
-      - "**.md"
-      - ".claude/**"
-      - "images/**"
-      - ".gitignore"
+    types: [completed]
   workflow_dispatch:
     inputs:
       services:
@@ -40,6 +37,7 @@ jobs:
   # 1) Detect which services have changes
   # ============================================================
   detect-changes:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.matrix.outputs.api }}
