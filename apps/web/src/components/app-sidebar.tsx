@@ -7,7 +7,6 @@ import { useT } from '@/components/dictionary-provider';
 import { useLocalePath } from '@/hooks/use-locale-path';
 import { useAuth } from '@/stores/auth';
 import { Avatar } from '@/components/ui/avatar';
-import { NotificationBell } from '@/components/notification-bell';
 import { OrgSwitcherDropdown } from '@/components/org-switcher-dropdown';
 import { UserProfileMenu } from '@/components/user-profile-menu';
 import { Logo } from '@/components/ui/logo';
@@ -111,11 +110,6 @@ export function AppSidebar({ orgId }: { orgId: string }) {
           );
         })}
       </nav>
-
-      {/* Notification Bell */}
-      <div className="flex justify-end self-stretch px-1 pb-2">
-        <NotificationBell />
-      </div>
 
       {/* User Profile */}
       <div className="relative self-stretch">
