@@ -2,22 +2,30 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const defaultLocale = 'en';
-const locales = ['en'];
+const locales = new Set([defaultLocale]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Already has locale prefix
-  const hasLocale = locales.some(
-    (l) => pathname.startsWith(`/${l}/`) || pathname === `/${l}`,
-  );
-  if (hasLocale) return;
+  // Extract first segment as potential locale
+  const segments = pathname.split('/');
+  const firstSegment = segments[1] ?? '';
 
-  // Add locale prefix
+  // Already has valid locale prefix → pass through
+  if (locales.has(firstSegment)) return;
+
+  // Has an invalid locale-like prefix (2-char segment, e.g. /vi/, /fr/) → replace with default
+  if (firstSegment.length === 2) {
+    segments[1] = defaultLocale;
+    request.nextUrl.pathname = segments.join('/');
+    return NextResponse.redirect(request.nextUrl);
+  }
+
+  // No locale prefix at all → add default
   request.nextUrl.pathname = `/${defaultLocale}${pathname}`;
   return NextResponse.redirect(request.nextUrl);
 }
 
 export const config = {
-  matcher: ['/((?!_next|api|favicon\\.ico|.*\\..*).*)',],
+  matcher: ['/((?!_next|api|favicon\\.svg|.*\\..*).*)',],
 };

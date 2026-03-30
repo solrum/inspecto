@@ -115,8 +115,9 @@ export async function uploadFile(
   // Verify all image files (magic bytes)
   for (const img of images) {
     const ext = '.' + img.originalname.split('.').pop()!.toLowerCase();
-    if (!verifyImageBuffer(img.buffer, ext)) {
-      throw new AppError(400, `Invalid image file: ${img.originalname} — content does not match ${ext} format`);
+    const imgCheck = verifyImageBuffer(img.buffer, ext);
+    if (!imgCheck.valid) {
+      throw new AppError(400, `Invalid image file: ${img.originalname} — ${imgCheck.error}`);
     }
   }
 
@@ -218,8 +219,9 @@ export async function uploadNewVersion(
   // Verify all image files
   for (const img of images) {
     const ext = '.' + img.originalname.split('.').pop()!.toLowerCase();
-    if (!verifyImageBuffer(img.buffer, ext)) {
-      throw new AppError(400, `Invalid image file: ${img.originalname} — content does not match ${ext} format`);
+    const imgCheck = verifyImageBuffer(img.buffer, ext);
+    if (!imgCheck.valid) {
+      throw new AppError(400, `Invalid image file: ${img.originalname} — ${imgCheck.error}`);
     }
   }
 
@@ -326,6 +328,7 @@ export async function getFile(fileId: string, userId: string) {
 
   return {
     ...formatFile(penFile),
+    project: { id: project.id, name: project.name, orgId: project.org_id },
     versions: versions.map(formatVersion),
   };
 }

@@ -15,8 +15,10 @@ import { Avatar } from '@/components/ui/avatar';
 import { CommentsPanel } from '@/components/comments-panel';
 import { Tabs } from '@/components/ui/tabs';
 import { ChevronRight } from 'lucide-react';
+import { LogoMark } from '@/components/ui/logo';
 import { useT } from '@/components/dictionary-provider';
 import { useLocalePath } from '@/hooks/use-locale-path';
+import { getLastOrgId } from '@/hooks/use-last-org';
 
 
 type Tab = 'design' | 'comments';
@@ -89,10 +91,17 @@ export default function FileViewerPage() {
 
   const customTopBar = (
     <header className="relative flex items-center justify-between h-[52px] px-5 bg-surface inset-shadow-border-b shrink-0">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary shrink-0"><span className="font-display text-sm font-bold text-primary-foreground">I</span></div>
+      <div className="relative z-10 flex items-center gap-2">
+        <a href="/" className="flex items-center">
+          <LogoMark size="sm" />
+        </a>
         <span className="font-sans text-[13px] text-foreground-muted">/</span>
-        <Link href={lp('/projects')} className="font-sans text-[13px] text-foreground-secondary no-underline">{tn('projects')}</Link>
+        <Link
+          href={lp(`/org/${fileData?.project?.orgId ?? getLastOrgId() ?? ''}/projects`)}
+          className="font-sans text-[13px] text-foreground-secondary no-underline"
+        >
+          {tn('projects')}
+        </Link>
         <ChevronRight size={14} className="text-foreground-muted shrink-0" />
         {fileData?.project?.name && (
           <>

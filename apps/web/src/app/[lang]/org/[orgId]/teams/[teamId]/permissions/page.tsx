@@ -109,6 +109,7 @@ export default function TeamPermissionsPage({
   return (
     <div className="flex flex-col gap-6 px-10 py-8">
       <Breadcrumb
+        homeHref="/"
         items={[
           { label: tc('admin'), href: lp(`/org/${orgId}/overview`) },
           { label: t('title'), href: lp(`/org/${orgId}/teams`) },

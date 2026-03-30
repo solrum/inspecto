@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { setLastOrgId } from '@/hooks/use-last-org';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useT } from '@/components/dictionary-provider';
@@ -39,6 +40,9 @@ export function AppSidebar({ orgId }: { orgId: string }) {
   const { user, logout } = useAuth();
   const tNav = useT('nav');
   const tAuth = useT('auth');
+
+  // Persist orgId so file/frame pages can link back
+  useEffect(() => { setLastOrgId(orgId); }, [orgId]);
 
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);

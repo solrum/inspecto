@@ -105,7 +105,7 @@ export default function TeamsPage({ params }: { params: Promise<{ orgId: string 
 
   return (
     <div className="flex h-full flex-col gap-6 px-10 py-8">
-      <Breadcrumb items={[{ label: tc('admin') }, { label: t('title') }]} />
+      <Breadcrumb homeHref="/" items={[{ label: tc('admin') }, { label: t('title') }]} />
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">

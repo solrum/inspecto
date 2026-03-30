@@ -136,6 +136,7 @@ export default function ProjectsPage({ params }: { params: Promise<{ orgId: stri
     <div className="flex flex-col gap-6 px-10 py-8">
       {/* Breadcrumb */}
       <Breadcrumb
+        homeHref="/"
         items={[
           { label: org?.name ?? tn('organization') },
           { label: t('title') },

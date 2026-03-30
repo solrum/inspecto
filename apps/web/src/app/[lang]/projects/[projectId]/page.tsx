@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useT } from '@/components/dictionary-provider';
 import { useLocalePath } from '@/hooks/use-locale-path';
+import { getLastOrgId } from '@/hooks/use-last-org';
 import { files as filesApi, projects as projectsApi, orgs } from '@/lib/api';
 import { SidebarLayout } from '@/components/sidebar-layout';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
@@ -132,6 +133,7 @@ export default function ProjectPage() {
 
         {/* Breadcrumb */}
         <Breadcrumb
+          homeHref="/"
           items={[
             { label: org?.name ?? tn('organization'), href: orgHref },
             { label: tn('projects'), href: orgHref },

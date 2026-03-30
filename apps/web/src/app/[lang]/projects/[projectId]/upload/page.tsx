@@ -8,6 +8,7 @@ import { useDropzone } from 'react-dropzone';
 import { extractImageRefs } from '@inspecto/shared';
 import { useT } from '@/components/dictionary-provider';
 import { useLocalePath } from '@/hooks/use-locale-path';
+import { getLastOrgId } from '@/hooks/use-last-org';
 import { validatePenFile, validateImageFile } from '@/lib/file-validation';
 import { files as filesApi, projects as projectsApi } from '@/lib/api';
 import { SidebarLayout } from '@/components/sidebar-layout';
@@ -347,6 +348,7 @@ export default function UploadPage() {
 
         {/* Breadcrumb */}
         <Breadcrumb
+          homeHref="/"
           items={[
             { label: tn('projects'), href: orgId ? lp(`/org/${orgId}/projects`) : undefined },
             { label: project?.name ?? 'Project', href: lp(`/projects/${projectId}`) },

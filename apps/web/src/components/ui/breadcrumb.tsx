@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { LogoMark } from '@/components/ui/logo';
 
 export interface BreadcrumbItem {
   label: string;
@@ -9,12 +10,21 @@ export interface BreadcrumbItem {
 
 interface BreadcrumbProps {
   items: BreadcrumbItem[];
+  homeHref?: string;
   className?: string;
 }
 
-export function Breadcrumb({ items, className }: BreadcrumbProps) {
+export function Breadcrumb({ items, homeHref, className }: BreadcrumbProps) {
   return (
     <nav className={cn('flex items-center gap-1.5 font-sans text-[13px]', className)}>
+      {homeHref && (
+        <>
+          <a href={homeHref} className="flex items-center">
+            <LogoMark size="sm" />
+          </a>
+          <ChevronRight size={14} className="text-foreground-muted" />
+        </>
+      )}
       {items.map((item, i) => {
         const isLast = i === items.length - 1;
         return (
