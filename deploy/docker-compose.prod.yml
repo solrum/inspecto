@@ -77,6 +77,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+      API_PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-inspecto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-inspecto}
       S3_ENDPOINT: http://minio:9000
     ports:
@@ -91,6 +92,7 @@ services:
     logging: *logging
     networks:
       - inspecto
+      - kidsync
 
   # ─── Web Client ────────────────────────────────────────────────────────
   web:
@@ -109,6 +111,7 @@ services:
     logging: *logging
     networks:
       - inspecto
+      - kidsync
 
   # ─── Auto-Update: Watchtower ───────────────────────────────────────────
   # Polls GHCR every 60s, auto-pulls & restarts labeled containers
@@ -118,6 +121,7 @@ services:
     container_name: inspecto-watchtower
     restart: unless-stopped
     environment:
+      DOCKER_API_VERSION: "1.44"
       WATCHTOWER_POLL_INTERVAL: 60
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
@@ -138,3 +142,6 @@ volumes:
 networks:
   inspecto:
     name: inspecto
+  kidsync:
+    external: true
+    name: kidsync_kidsync
