@@ -9,7 +9,8 @@ import { useAuth } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import { Search, Eye, EyeOff, Globe } from 'lucide-react';
+import { Eye, EyeOff, Globe } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 
 export default function RegisterPage() {
   const t = useT('auth');
@@ -50,11 +51,7 @@ export default function RegisterPage() {
     <div className="flex min-h-screen">
       {/* Left Panel — design: fill_container, gradient rotation=180, align=center, justify=center, gap=32, padding=48 */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8 p-12 bg-gradient-to-b from-brand-gradient-from to-brand-gradient-to">
-        {/* Logo: search 32x32 white + "Inspecto" 28px 700, gap=12 */}
-        <div className="flex items-center gap-3">
-          <Search size={32} className="text-brand-text shrink-0" />
-          <span className="font-display text-[28px] font-bold text-brand-text">{t('appName')}</span>
-        </div>
+        <Logo size="lg" textClassName="text-brand-text" />
 
         {/* Tagline: 24px 600, lh=1.4, center, width=360 */}
         <p className="font-display text-2xl font-semibold leading-[1.4] text-center text-brand-text w-[360px] m-0 whitespace-pre-line">

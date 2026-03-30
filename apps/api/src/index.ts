@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'node:path';
 import { env } from './config/env.js';
+import { db } from './config/database.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -39,8 +41,31 @@ app.use('/api/notifications', notificationRoutes);
 // Error handler
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  console.log(`Inspecto API running on port ${env.port}`);
-});
+async function start() {
+  // Auto-run migrations
+  const isProduction = env.nodeEnv === 'production';
+  const migrationsDir = isProduction
+    ? path.resolve(__dirname, './migrations')
+    : path.resolve(__dirname, '../migrations');
+
+  try {
+    const [batch, migrations] = await db.migrate.latest({
+      directory: migrationsDir,
+      extension: isProduction ? 'js' : 'ts',
+    });
+    if (migrations.length > 0) {
+      console.log(`Migrations batch ${batch}: ${migrations.length} applied`);
+    }
+  } catch (err) {
+    console.error('Migration failed:', err);
+    process.exit(1);
+  }
+
+  app.listen(env.port, () => {
+    console.log(`Inspecto API running on port ${env.port}`);
+  });
+}
+
+start();
 
 export default app;

@@ -9,7 +9,8 @@ import { useAuth } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-import { ScanEye, Eye, EyeOff, Globe } from 'lucide-react';
+import { Eye, EyeOff, Globe } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 
 export default function LoginPage() {
   const t = useT('auth');
@@ -42,11 +43,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left Panel — design: w=720, gradient, padding=48, gap=32, justify=center */}
       <div className="w-[720px] shrink-0 flex flex-col justify-center gap-8 p-12 bg-gradient-to-br from-brand-gradient-from to-brand-gradient-to">
-        {/* Logo: scan-eye 36x36 white + "Inspecto" font-primary 28px 700, gap=12 */}
-        <div className="flex items-center gap-3">
-          <ScanEye size={36} className="text-brand-text shrink-0" />
-          <span className="font-display text-[28px] font-bold text-brand-text">{t('appName')}</span>
-        </div>
+        <Logo size="lg" textClassName="text-brand-text" />
 
         {/* Tagline block: gap=12 */}
         <div className="flex flex-col gap-3">

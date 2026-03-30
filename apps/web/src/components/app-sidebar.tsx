@@ -10,8 +10,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notification-bell';
 import { OrgSwitcherDropdown } from '@/components/org-switcher-dropdown';
 import { UserProfileMenu } from '@/components/user-profile-menu';
+import { Logo } from '@/components/ui/logo';
 import {
-  Eye,
   LayoutDashboard,
   FolderOpen,
   Users,
@@ -58,8 +58,7 @@ export function AppSidebar({ orgId }: { orgId: string }) {
         href={lp(`/org/${orgId}/overview`)}
         className="flex items-center gap-2.5 self-stretch pb-6"
       >
-        <Eye size={24} className="shrink-0 text-primary" />
-        <span className="font-display text-xl font-bold text-foreground">{tAuth('appName')}</span>
+        <Logo size="sm" textClassName="text-foreground" />
       </Link>
 
       {/* Org Switcher */}

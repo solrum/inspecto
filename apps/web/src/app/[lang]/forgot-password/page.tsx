@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { ArrowLeft, ArrowRight, Lock, Mail } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 
 export default function ForgotPasswordPage() {
   const t = useT('auth');
@@ -41,13 +42,7 @@ export default function ForgotPasswordPage() {
        * stroke inside 1px + outer shadow
        */}
       <div className="w-[480px] py-12 px-10 flex flex-col items-center gap-8 bg-card rounded-xl inset-shadow-border shadow-lg">
-        {/* Logo: box 28x28, radius=6, fill=primary + text 18px 700, gap=8 */}
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-sm bg-primary flex items-center justify-center shrink-0">
-            <span className="font-display text-sm font-bold text-primary-foreground">I</span>
-          </div>
-          <span className="font-display text-lg font-bold text-foreground">{t('appName')}</span>
-        </div>
+        <Logo size="sm" textClassName="text-foreground" />
 
         {/* Lock circle: 64x64, radius=pill, fill=primary-light, icon 28x28 */}
         <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary-light">

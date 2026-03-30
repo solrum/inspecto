@@ -2,12 +2,16 @@ import knex from 'knex';
 import { env } from './env.js';
 import path from 'node:path';
 
+const isProduction = env.nodeEnv === 'production';
+
 const db = knex({
   client: 'pg',
   connection: env.databaseUrl,
   migrations: {
-    directory: path.resolve(__dirname, '../../migrations'),
-    extension: 'ts',
+    directory: isProduction
+      ? path.resolve(__dirname, '../migrations')
+      : path.resolve(__dirname, '../../migrations'),
+    extension: isProduction ? 'js' : 'ts',
   },
 });
 

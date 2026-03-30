@@ -19,6 +19,8 @@ RUN pnpm --filter @inspecto/shared build
 FROM build-shared AS build
 COPY apps/api/ apps/api/
 RUN pnpm --filter @inspecto/api build
+# Compile migrations (TS → JS) so knex can load them in production
+RUN cd apps/api && npx tsc --outDir dist/migrations --rootDir migrations migrations/*.ts --esModuleInterop --module Node16 --moduleResolution Node16 --target ES2022 --skipLibCheck
 
 # ─── Production ──────────────────────────────────────────────────────────
 FROM base AS runner
@@ -29,7 +31,6 @@ COPY --from=deps /app/packages/shared/node_modules packages/shared/node_modules/
 COPY --from=deps /app/apps/api/node_modules apps/api/node_modules/
 COPY --from=build-shared /app/packages/shared/dist packages/shared/dist/
 COPY --from=build /app/apps/api/dist apps/api/dist/
-COPY apps/api/migrations apps/api/migrations/
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 WORKDIR /app/apps/api
