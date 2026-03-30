@@ -23,7 +23,7 @@ export default function Home() {
       } else {
         // No orgs — auto-create a default workspace for legacy/edge-case users
         const name = user?.name ?? user?.email ?? 'My';
-        const org = await orgs.create(`${name}'s Workspace`);
+        const org = await orgs.create({ name: `${name}'s Workspace` });
         router.replace(lp(`/org/${org.id}/overview`));
       }
     }).catch(() => {

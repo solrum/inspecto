@@ -10,7 +10,7 @@ import { useLocalePath } from '@/hooks/use-locale-path';
 
 interface UserProfileMenuProps {
   orgId: string;
-  user: { name: string; email?: string; avatarUrl?: string } | null;
+  user: { name: string; email?: string; avatarUrl?: string | null } | null;
   onClose: () => void;
   onLogout: () => void;
 }

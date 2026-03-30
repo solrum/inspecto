@@ -1,0 +1,203 @@
+# ============================================================
+# Inspecto — Build & Push on main
+# ============================================================
+# Triggers on push to main branch.
+# Detects which services changed, builds only those, pushes to GHCR.
+# Watchtower on server auto-pulls new images (poll every 60s).
+# ============================================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".claude/**"
+      - "images/**"
+      - ".gitignore"
+  workflow_dispatch:
+    inputs:
+      services:
+        description: "Services to build (comma-separated: api,web or 'all')"
+        required: true
+        default: "all"
+        type: string
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ============================================================
+  # 1) Detect which services have changes
+  # ============================================================
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.matrix.outputs.api }}
+      web: ${{ steps.matrix.outputs.web }}
+      services: ${{ steps.matrix.outputs.services }}
+      has_changes: ${{ steps.matrix.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Manual trigger — set selected services
+        if: github.event_name == 'workflow_dispatch'
+        id: manual
+        run: |
+          INPUT="${{ github.event.inputs.services }}"
+          ALL_SERVICES="api web"
+
+          if [ "$INPUT" == "all" ]; then
+            SELECTED="$ALL_SERVICES"
+          else
+            SELECTED=$(echo "$INPUT" | tr ',' ' ')
+          fi
+
+          for svc in $ALL_SERVICES; do
+            if echo "$SELECTED" | grep -qw "$svc"; then
+              echo "$svc=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$svc=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+      - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
+        id: changes
+        with:
+          filters: |
+            shared:
+              - 'packages/shared/**'
+              - 'tsconfig.base.json'
+            api:
+              - 'packages/shared/**'
+              - 'tsconfig.base.json'
+              - 'apps/api/**'
+            web:
+              - 'packages/shared/**'
+              - 'tsconfig.base.json'
+              - 'apps/web/**'
+
+      - name: Build service matrix
+        id: matrix
+        env:
+          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          MANUAL_API: ${{ steps.manual.outputs.api }}
+          MANUAL_WEB: ${{ steps.manual.outputs.web }}
+          AUTO_API: ${{ steps.changes.outputs.api }}
+          AUTO_WEB: ${{ steps.changes.outputs.web }}
+        run: |
+          if [ "$IS_MANUAL" == "true" ]; then
+            API=$MANUAL_API; WEB=$MANUAL_WEB
+          else
+            API=$AUTO_API; WEB=$AUTO_WEB
+          fi
+
+          echo "api=$API" >> "$GITHUB_OUTPUT"
+          echo "web=$WEB" >> "$GITHUB_OUTPUT"
+
+          services=()
+          if [ "$API" == "true" ]; then
+            services+=('{"name":"api","image":"inspecto-api","dockerfile":"apps/api/Dockerfile","build_args":""}')
+          fi
+          if [ "$WEB" == "true" ]; then
+            services+=('{"name":"web","image":"inspecto-web","dockerfile":"apps/web/Dockerfile","build_args":"NEXT_PUBLIC_API_URL=https://inspecto.solrum.dev/api"}')
+          fi
+
+          if [ ${#services[@]} -eq 0 ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "services=[]" >> "$GITHUB_OUTPUT"
+            echo "::notice::No service changes detected — skipping build"
+          else
+            json=$(printf '%s,' "${services[@]}")
+            json="[${json%,}]"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "services=$json" >> "$GITHUB_OUTPUT"
+            echo "::notice::Building services: $(echo $json | jq -r '.[].name' | tr '\n' ' ')"
+          fi
+
+  # ============================================================
+  # 2) Build & push changed services (parallel matrix)
+  # ============================================================
+  build-push:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.service.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          build-args: ${{ matrix.service.build_args }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+
+      - name: Summary
+        run: |
+          echo "### ${{ matrix.service.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`${{ env.REGISTRY }}/${{ matrix.service.image }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA tag: \`${GITHUB_SHA::7}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Watchtower will auto-pull within 60s" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # 3) Summary
+  # ============================================================
+  deploy-summary:
+    needs: [detect-changes, build-push]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy summary
+        run: |
+          echo "## Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.detect-changes.outputs.has_changes }}" != "true" ]; then
+            echo "No service changes detected — nothing to deploy." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          if [ "${{ needs.build-push.result }}" == "success" ]; then
+            echo "All builds succeeded. Watchtower will auto-deploy within 60s." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Some builds failed. Check individual job logs." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

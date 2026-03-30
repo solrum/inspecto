@@ -11,6 +11,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 # ─── Build shared package ───────────────────────────────────────────────
 FROM deps AS build-shared
+COPY tsconfig.base.json ./
 COPY packages/shared/ packages/shared/
 RUN pnpm --filter @inspecto/shared build
 

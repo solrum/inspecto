@@ -11,6 +11,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 # ─── Build shared package ───────────────────────────────────────────────
 FROM deps AS build-shared
+COPY tsconfig.base.json ./
 COPY packages/shared/ packages/shared/
 RUN pnpm --filter @inspecto/shared build
 
@@ -31,8 +32,6 @@ COPY --from=build /app/apps/api/dist apps/api/dist/
 COPY apps/api/migrations apps/api/migrations/
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
-COPY apps/api/knexfile.ts apps/api/
-
 WORKDIR /app/apps/api
 EXPOSE 3001
 

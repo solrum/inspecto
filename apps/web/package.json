@@ -6,7 +6,7 @@
     "dev": "WATCHPACK_POLLING=true next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
