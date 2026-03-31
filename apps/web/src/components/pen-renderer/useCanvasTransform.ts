@@ -176,15 +176,13 @@ export function useCanvasTransform({
     }
 
     if (animate && contentRef.current) {
-      // Ensure current transform is committed to DOM before adding transition
-      contentRef.current.style.transition = ''
-      // Force reflow so browser registers current position
-      void contentRef.current.offsetHeight
       contentRef.current.style.transition = 'transform 0.3s ease-out'
-      applyTransform()
-      setTimeout(() => {
-        if (contentRef.current) contentRef.current.style.transition = ''
-      }, 320)
+      requestAnimationFrame(() => {
+        applyTransform()
+        setTimeout(() => {
+          if (contentRef.current) contentRef.current.style.transition = ''
+        }, 320)
+      })
     } else {
       applyTransform()
     }
