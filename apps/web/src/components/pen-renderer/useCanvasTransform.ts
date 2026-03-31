@@ -109,21 +109,9 @@ export function useCanvasTransform({
         scale,
       }
 
-      if (animate && contentRef.current) {
-        contentRef.current.style.transition = 'transform 0.3s ease-out'
-        requestAnimationFrame(() => {
-          transformRef.current = newTransform
-          applyTransform()
-          scheduleZoomDisplay()
-          setTimeout(() => {
-            if (contentRef.current) contentRef.current.style.transition = ''
-          }, 320)
-        })
-      } else {
-        transformRef.current = newTransform
-        applyTransform()
-        scheduleZoomDisplay()
-      }
+      transformRef.current = newTransform
+      applyTransform()
+      scheduleZoomDisplay()
     },
     [frames, applyTransform, scheduleZoomDisplay]
   )
@@ -177,19 +165,8 @@ export function useCanvasTransform({
       y: ch / 2 - (nodeY + nodeH / 2) * scale,
     }
 
-    if (animate && contentRef.current) {
-      contentRef.current.style.transition = 'transform 0.3s ease-out'
-      requestAnimationFrame(() => {
-        transformRef.current = newTransform
-        applyTransform()
-        setTimeout(() => {
-          if (contentRef.current) contentRef.current.style.transition = ''
-        }, 320)
-      })
-    } else {
-      transformRef.current = newTransform
-      applyTransform()
-    }
+    transformRef.current = newTransform
+    applyTransform()
   }, [applyTransform])
 
   // One-shot focus — only react to focusNodeId changes, not focusNodeById identity
