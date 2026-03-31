@@ -49,6 +49,7 @@ export default function SingleFramePage() {
   const lp = useLocalePath()
   const [activeTab, setActiveTab] = useState<Tab>('design')
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  const [focusNodeId, setFocusNodeId] = useState<string | undefined>(undefined)
   const showComments = activeTab === 'comments'
 
   const { data: fileData } = useQuery({
@@ -143,6 +144,15 @@ export default function SingleFramePage() {
     setHighlightedId(commentId)
     setActiveTab('comments')
   }, [])
+
+  // Click comment in panel → focus camera on its node
+  const handleFocusComment = useCallback((commentId: string) => {
+    setHighlightedId(commentId)
+    const comment = commentList.find((c: any) => c.id === commentId)
+    if (comment?.nodeId) {
+      setFocusNodeId(`${comment.nodeId}__${Date.now()}`)
+    }
+  }, [commentList])
 
   // Keyboard: Esc back
   useEffect(() => {

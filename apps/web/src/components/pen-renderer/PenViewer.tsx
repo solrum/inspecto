@@ -3,7 +3,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import type { PenDocument, PenChild, PenTheme } from './types'
 import { VarResolver } from './resolver'
-import { CanvasView, FramePicker, type CommentPin } from './CanvasView'
+import { CanvasView, type CommentPin } from './CanvasView'
+import { FramePicker } from './FramePicker'
 import { NodeInspector } from './NodeInspector'
 import { createParserFactory, buildComponentRegistry } from './engine'
 import { HTMLRendererComponent } from './engine/renderers/html'
@@ -52,6 +53,8 @@ interface PenViewerProps {
   onSelectedFrameChange?: (id: string) => void
   /** Current user name for comment popup */
   userName?: string
+  /** Focus camera on a specific node */
+  focusNodeId?: string
   /** Comment pins to render in document space */
   commentPins?: CommentPin[]
   /** Called when a pin is clicked */
@@ -74,6 +77,7 @@ export function PenViewer({
   defaultSelectedFrameId,
   onSelectedFrameChange,
   userName,
+  focusNodeId,
   commentPins,
   onClickPin,
 }: PenViewerProps) {
@@ -259,6 +263,7 @@ export function PenViewer({
             selectedId={config.readOnly ? null : selectedNodeId}
             onSelectNode={config.readOnly ? undefined : handleSelectFromCanvas}
             initialFrame={focusFrame}
+            focusNodeId={focusNodeId}
             canvasBg={canvasBg}
             onCanvasBgChange={setCanvasBg}
             onRefocus={handleRefocus}

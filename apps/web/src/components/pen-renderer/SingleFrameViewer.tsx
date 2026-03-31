@@ -16,7 +16,7 @@ import { createParserFactory, buildComponentRegistry } from './engine'
 import { HTMLRendererComponent } from './engine/renderers/html'
 import { NodeInspector } from './NodeInspector'
 import { ZoomControl } from './ZoomControl'
-import { FramePicker } from './CanvasView'
+import { FramePicker } from './FramePicker'
 
 interface SingleFrameViewerProps {
   document: PenDocument

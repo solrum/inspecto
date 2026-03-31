@@ -1,15 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { files as filesApi } from '@/lib/api';
+import { files as filesApi, comments as commentsApi } from '@/lib/api';
 import { useAuth } from '@/stores/auth';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useViewerStore } from '@/stores/viewer';
 import { PenViewer } from '@/components/pen-renderer';
-import type { PenDocument } from '@/components/pen-renderer';
+import type { PenDocument, CommentPin } from '@/components/pen-renderer';
 import { Spinner } from '@/components/ui/spinner';
 import { Avatar } from '@/components/ui/avatar';
 import { CommentsPanel } from '@/components/comments-panel';
@@ -23,15 +23,39 @@ import { getLastOrgId } from '@/hooks/use-last-org';
 
 type Tab = 'design' | 'comments';
 
+function findNodeInFrames(frames: any[], nodeId: string): { frameId: string; node: any } | null {
+  for (const frame of frames) {
+    if (frame.id === nodeId) return { frameId: frame.id, node: frame };
+    const found = findNodeInChildren(frame.children ?? [], nodeId);
+    if (found) return { frameId: frame.id, node: found };
+  }
+  return null;
+}
+
+function findNodeInChildren(children: any[], id: string): any | null {
+  for (const child of children) {
+    if (child.id === id) return child;
+    if (child.children?.length) {
+      const found = findNodeInChildren(child.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export default function FileViewerPage() {
   const { isAuthenticated } = useAuthGuard();
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileId = params.fileId as string;
   const { user } = useAuth();
   const t = useT('fileViewer');
   const tn = useT('nav');
   const lp = useLocalePath();
+
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [focusNodeId, setFocusNodeId] = useState<string | undefined>(undefined);
 
   // Persisted viewer state — read once on mount, write without causing re-render
   const viewerStateRef = useRef(useViewerStore.getState().get(fileId));
@@ -71,6 +95,88 @@ export default function FileViewerPage() {
     queryFn: () => filesApi.getContent(fileId, currentVersion?.id),
     enabled: !!currentVersion?.id,
   });
+
+  const { data: commentList = [] } = useQuery({
+    queryKey: ['comments', fileId],
+    queryFn: () => commentsApi.list(fileId),
+    enabled: isAuthenticated && !!fileId,
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (data: Parameters<typeof commentsApi.create>[1]) =>
+      commentsApi.create(fileId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', fileId] });
+    },
+  });
+
+  const handleAddComment = useCallback((nodeId: string, body: string, pinXRatio: number, pinYRatio: number) => {
+    if (!penDocument) return;
+    const doc = penDocument as PenDocument;
+    const result = findNodeInFrames(doc.children, nodeId);
+    if (!result) return;
+
+    addCommentMutation.mutate({
+      body,
+      frameId: result.frameId,
+      versionId: currentVersion?.id,
+      nodeId,
+      pinXRatio,
+      pinYRatio,
+      anchorMeta: {
+        name: result.node.name ?? null,
+        type: result.node.type,
+        parentId: null,
+        bbox: {
+          x: typeof result.node.x === 'number' ? result.node.x : null,
+          y: typeof result.node.y === 'number' ? result.node.y : null,
+          w: typeof result.node.width === 'number' ? result.node.width : null,
+          h: typeof result.node.height === 'number' ? result.node.height : null,
+        },
+      },
+    });
+  }, [penDocument, currentVersion?.id, addCommentMutation]);
+
+  // Compute comment pins for all frames
+  const commentPins = useMemo<CommentPin[]>(() => {
+    if (!penDocument || !commentList.length) return [];
+    const doc = penDocument as PenDocument;
+    return commentList
+      .filter((c: any) => !c.parentCommentId && (c.nodeId || (typeof c.pinXRatio === 'number' && typeof c.pinYRatio === 'number')))
+      .map((c: any) => {
+        // Find parent frame for this comment
+        const frame = doc.children.find((f: any) => f.id === c.frameId) as any;
+        const fw = frame ? (typeof frame.width === 'number' ? frame.width : 1) : 1;
+        const fh = frame ? (typeof frame.height === 'number' ? frame.height : 1) : 1;
+        const fx = frame ? (typeof frame.x === 'number' ? frame.x : 0) : 0;
+        const fy = frame ? (typeof frame.y === 'number' ? frame.y : 0) : 0;
+        return {
+          id: c.id,
+          nodeId: c.nodeId ?? null,
+          fallbackDocX: typeof c.pinXRatio === 'number' ? fx + c.pinXRatio * fw : undefined,
+          fallbackDocY: typeof c.pinYRatio === 'number' ? fy + c.pinYRatio * fh : undefined,
+          anchorStatus: c.anchorStatus ?? 'active',
+          resolved: !!c.resolved,
+          authorName: c.authorName,
+          body: c.body,
+        };
+      });
+  }, [commentList, penDocument]);
+
+  const handleClickPin = useCallback((commentId: string) => {
+    setHighlightedId(commentId);
+    setActiveTab('comments');
+  }, []);
+
+  // Click comment in panel → focus camera on its node
+  const handleFocusComment = useCallback((commentId: string) => {
+    setHighlightedId(commentId);
+    const comment = commentList.find((c: any) => c.id === commentId);
+    console.log('[FileViewer] handleFocusComment:', commentId, 'nodeId:', comment?.nodeId);
+    if (comment?.nodeId) {
+      setFocusNodeId(`${comment.nodeId}__${Date.now()}`);
+    }
+  }, [commentList]);
 
   if (!isAuthenticated) return null;
 
@@ -114,8 +220,13 @@ export default function FileViewerPage() {
 
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
         {tabs.map((tab) => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={activeTab === tab.key ? 'px-4 py-2 rounded-t-md bg-primary-light font-sans text-[13px] font-medium text-primary border-none cursor-pointer' : 'px-4 py-2 bg-transparent font-sans text-[13px] text-foreground-secondary border-none cursor-pointer'}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={activeTab === tab.key ? 'flex items-center px-4 py-2 rounded-t-md bg-primary-light font-sans text-[13px] font-medium text-primary border-none cursor-pointer' : 'flex items-center px-4 py-2 bg-transparent font-sans text-[13px] text-foreground-secondary border-none cursor-pointer'}>
             {tab.label}
+            {tab.key === 'comments' && commentList.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-px rounded-full bg-primary-light text-[10px] font-semibold text-primary">
+                {commentList.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -148,6 +259,8 @@ export default function FileViewerPage() {
                 mode: 'all-frames',
                 hideTopBar: true,
                 hideInspector: showComments,
+                canComment: true,
+                onAddComment: handleAddComment,
                 onNavigateFrame: (fid) => router.push(lp(`/files/${fileId}/${fid}`)),
               }}
               height="100%"
@@ -155,10 +268,20 @@ export default function FileViewerPage() {
               onTransformChange={handleTransformChange}
               defaultSelectedFrameId={viewerStateRef.current.selectedFrameId}
               onSelectedFrameChange={handleSelectedFrameChange}
+              userName={user?.name ?? user?.email}
+              focusNodeId={focusNodeId}
+              commentPins={commentPins}
+              onClickPin={handleClickPin}
             />
             </div>
             {showComments && (
-              <CommentsPanel fileId={fileId} versionId={currentVersion?.id} onClose={() => setActiveTab('design')} />
+              <CommentsPanel
+                fileId={fileId}
+                versionId={currentVersion?.id}
+                onClose={() => setActiveTab('design')}
+                highlightedId={highlightedId}
+                onFocusComment={handleFocusComment}
+              />
             )}
           </div>
         </>
