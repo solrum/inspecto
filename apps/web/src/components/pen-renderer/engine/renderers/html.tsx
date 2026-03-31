@@ -7,7 +7,7 @@
  * Uses React.memo + context for selection to avoid full re-renders.
  */
 
-import React, { createContext, useContext, memo, useMemo, useRef, type CSSProperties } from 'react'
+import React, { createContext, useContext, memo, useMemo, useRef, useState, useEffect, type CSSProperties } from 'react'
 import type { IRenderNode, IRenderer } from '../interfaces'
 
 // ─── Selection Context (prevents full re-render on click) ───
@@ -220,28 +220,49 @@ function buildCSS(node: IRenderNode): CSSProperties {
   return s
 }
 
-// ─── Icon Mask ───
+// ─── Icon (fetched from Iconify CDN) ───
+
+const ICON_FAMILY_MAP: Record<string, string> = {
+  lucide: 'lucide',
+  feather: 'feather',
+  'Material Symbols Outlined': 'material-symbols',
+  'Material Symbols Rounded': 'material-symbols',
+  'Material Symbols Sharp': 'material-symbols',
+  phosphor: 'ph',
+};
+
+const iconCache = new Map<string, string>();
 
 const IconMask = memo(function IconMask({ name, family, color, size }: {
   name: string; family: string; color: string; size: number
 }) {
-  const iconUrl = `/api/icons/${encodeURIComponent(family)}/${encodeURIComponent(name)}.svg`
+  const [svgBody, setSvgBody] = useState<string | null>(() => iconCache.get(`${family}/${name}`) ?? null);
+  const setName = ICON_FAMILY_MAP[family] ?? family;
+  const cacheKey = `${family}/${name}`;
 
-  const style = useMemo<CSSProperties>(() => ({
-    width: `${size}px`,
-    height: `${size}px`,
-    backgroundColor: color,
-    WebkitMaskImage: `url("${iconUrl}")`,
-    WebkitMaskSize: 'contain',
-    WebkitMaskRepeat: 'no-repeat',
-    WebkitMaskPosition: 'center',
-    maskImage: `url("${iconUrl}")`,
-    maskSize: 'contain',
-    maskRepeat: 'no-repeat',
-    maskPosition: 'center',
-  }), [size, color, iconUrl])
+  useEffect(() => {
+    if (iconCache.has(cacheKey)) { setSvgBody(iconCache.get(cacheKey)!); return; }
 
-  return <div style={style} />
+    const url = `https://api.iconify.design/${encodeURIComponent(setName)}/${encodeURIComponent(name)}.svg`;
+    fetch(url)
+      .then((r) => r.ok ? r.text() : null)
+      .then((svg) => {
+        if (svg) { iconCache.set(cacheKey, svg); setSvgBody(svg); }
+      })
+      .catch(() => {});
+  }, [cacheKey, setName, name]);
+
+  if (!svgBody) {
+    return <div style={{ width: size, height: size, backgroundColor: color, borderRadius: 2, opacity: 0.2 }} />;
+  }
+
+  // Inject size + color into SVG
+  const styled = svgBody
+    .replace(/width="[^"]*"/, `width="${size}"`)
+    .replace(/height="[^"]*"/, `height="${size}"`)
+    .replace(/<svg\b/, `<svg style="color:${color}"`);
+
+  return <div style={{ width: size, height: size, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: styled }} />;
 })
 
 // ─── Legacy class interface (for IRenderer compatibility) ───
