@@ -103,7 +103,7 @@ export function useCanvasTransform({
       const fh = typeof frame.height === 'number' ? frame.height : 800
 
       const scale = Math.min((cw - 60) / fw, (ch - 60) / fh, 1)
-      transformRef.current = {
+      const newTransform = {
         x: cw / 2 - (fx + fw / 2) * scale,
         y: ch / 2 - (fy + fh / 2) * scale,
         scale,
@@ -112,6 +112,7 @@ export function useCanvasTransform({
       if (animate && contentRef.current) {
         contentRef.current.style.transition = 'transform 0.3s ease-out'
         requestAnimationFrame(() => {
+          transformRef.current = newTransform
           applyTransform()
           scheduleZoomDisplay()
           setTimeout(() => {
@@ -119,6 +120,7 @@ export function useCanvasTransform({
           }, 320)
         })
       } else {
+        transformRef.current = newTransform
         applyTransform()
         scheduleZoomDisplay()
       }
@@ -169,7 +171,7 @@ export function useCanvasTransform({
     const nodeH = nodeRect.height / scale
 
     // Pan so node is centered in viewport
-    transformRef.current = {
+    const newTransform = {
       ...transformRef.current,
       x: cw / 2 - (nodeX + nodeW / 2) * scale,
       y: ch / 2 - (nodeY + nodeH / 2) * scale,
@@ -178,12 +180,14 @@ export function useCanvasTransform({
     if (animate && contentRef.current) {
       contentRef.current.style.transition = 'transform 0.3s ease-out'
       requestAnimationFrame(() => {
+        transformRef.current = newTransform
         applyTransform()
         setTimeout(() => {
           if (contentRef.current) contentRef.current.style.transition = ''
         }, 320)
       })
     } else {
+      transformRef.current = newTransform
       applyTransform()
     }
   }, [applyTransform])
