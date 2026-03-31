@@ -3,33 +3,24 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import type { PenDocument, PenChild, PenTheme } from './types'
 import { VarResolver } from './resolver'
-import { CanvasView, type CommentPin } from './CanvasView'
+import { CanvasView } from './CanvasView'
+import type { CommentPin } from './CommentOverlay'
+import { CommentPinMarker, AddCommentTrigger, CommentPopup } from './CommentOverlay'
 import { FramePicker } from './FramePicker'
 import { NodeInspector } from './NodeInspector'
-import { createParserFactory, buildComponentRegistry } from './engine'
-import { HTMLRendererComponent } from './engine/renderers/html'
-import { ZoomControl } from './ZoomControl'
+import { useCanvas } from './canvas-context'
 
 // ═══ ViewerConfig ═══
 
 export interface ViewerConfig {
-  /** 'all-frames' shows all frames, 'single-frame' shows one frame fit-to-container */
   mode: 'all-frames' | 'single-frame'
-  /** Frame id for single-frame mode */
   frameId?: string
-  /** Read-only mode (disable selection highlight on canvas) */
   readOnly?: boolean
-  /** Enable add-comment on selected node */
   canComment?: boolean
-  /** Callback when user adds a comment. pinXRatio/pinYRatio are DOM-computed relative to frame. */
   onAddComment?: (nodeId: string, body: string, pinXRatio: number, pinYRatio: number) => void
-  /** Hide layers panel */
   hideLayersPanel?: boolean
-  /** Hide inspector panel */
   hideInspector?: boolean
-  /** Hide top bar */
   hideTopBar?: boolean
-  /** Navigate between frames in single-frame mode */
   onNavigateFrame?: (frameId: string) => void
 }
 
@@ -46,18 +37,13 @@ interface PenViewerProps {
   topBar?: ReactNode
   onSelectNode?: (id: string, node: PenChild) => void
   selectedId?: string | null
-  /** Saved canvas transform to restore */
   savedTransform?: { x: number; y: number; scale: number } | null
   onTransformChange?: (t: { x: number; y: number; scale: number }) => void
   defaultSelectedFrameId?: string | null
   onSelectedFrameChange?: (id: string) => void
-  /** Current user name for comment popup */
   userName?: string
-  /** Focus camera on a specific node */
   focusNodeId?: string
-  /** Comment pins to render in document space */
   commentPins?: CommentPin[]
-  /** Called when a pin is clicked */
   onClickPin?: (commentId: string) => void
 }
 
@@ -179,6 +165,21 @@ export function PenViewer({
   const handleSelectFromLayers = useCallback((id: string) => selectNode(id, null, 'layers'), [selectNode])
   const handleSelectFromCanvas = useCallback((id: string, node: PenChild) => selectNode(id, node, 'canvas'), [selectNode])
 
+  // ═══ External focus (from comment click) → also select the node ═══
+  const prevFocusNodeId = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!focusNodeId || focusNodeId === prevFocusNodeId.current) return
+    prevFocusNodeId.current = focusNodeId
+    const nodeId = focusNodeId.split('__')[0]
+    const node = findNodeInTree(doc.children, nodeId)
+    if (node) {
+      setInternalSelectedId(nodeId)
+      setInternalSelectedNode(node)
+      setAutoExpandTo(nodeId)
+      onSelectNodeProp?.(nodeId, node)
+    }
+  }, [focusNodeId, doc.children, onSelectNodeProp])
+
   // ═══ Refocus ═══
 
   const getRefocusFrameId = useCallback((): string | null => {
@@ -205,7 +206,6 @@ export function PenViewer({
   }, [])
 
   // ═══ Layers data ═══
-  // In single-frame mode, show children of the frame. In all-frames, show all.
   const layerFrames = isSingleFrame && config.frameId
     ? (viewFrames[0] ? [viewFrames[0]] : [])
     : doc.children
@@ -256,6 +256,7 @@ export function PenViewer({
         )}
 
         {/* Canvas */}
+        <CommentPopupProvider>
         <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
           <CanvasView
             document={isSingleFrame ? viewDoc : doc}
@@ -273,12 +274,28 @@ export function PenViewer({
             onTransformChange={onTransformChange}
             onPrevFrame={onPrevFrame}
             onNextFrame={onNextFrame}
-            onAddComment={config.canComment ? config.onAddComment : undefined}
-            userName={userName}
-            commentPins={commentPins}
-            onClickPin={onClickPin}
-          />
+            onExpandFrame={!isSingleFrame && config.onNavigateFrame && selectedFrameId ? () => config.onNavigateFrame!(selectedFrameId) : null}
+            screenChildren={
+              config.canComment ? (
+                <CommentScreenLayer
+                  onAddComment={config.onAddComment}
+                  userName={userName}
+                />
+              ) : undefined
+            }
+          >
+            {/* Comment pins + add trigger — document space (follows pan/zoom) */}
+            {config.canComment && (
+              <CommentDocLayer
+                commentPins={commentPins}
+                onClickPin={onClickPin}
+                selectedId={config.readOnly ? null : selectedNodeId ?? null}
+                onAddComment={config.onAddComment}
+              />
+            )}
+          </CanvasView>
         </div>
+        </CommentPopupProvider>
 
         {/* Inspector */}
         {!config.hideInspector && (
@@ -286,6 +303,107 @@ export function PenViewer({
         )}
       </div>
     </div>
+  )
+}
+
+// ═══ Comment popup shared state (between doc layer and screen layer) ═══
+
+const CommentPopupContext = React.createContext<{
+  popup: { nodeId: string; x: number; y: number } | null
+  setPopup: (v: { nodeId: string; x: number; y: number } | null) => void
+}>({ popup: null, setPopup: () => {} })
+
+function CommentPopupProvider({ children }: { children: React.ReactNode }) {
+  const [popup, setPopup] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  const value = useMemo(() => ({ popup, setPopup }), [popup])
+  return <CommentPopupContext.Provider value={value}>{children}</CommentPopupContext.Provider>
+}
+
+// ═══ Document-space layer: pins + add-comment trigger ═══
+
+function CommentDocLayer({
+  commentPins,
+  onClickPin,
+  selectedId,
+  onAddComment,
+}: {
+  commentPins?: CommentPin[]
+  onClickPin?: (commentId: string) => void
+  selectedId: string | null
+  onAddComment?: (nodeId: string, body: string, pinXRatio: number, pinYRatio: number) => void
+}) {
+  const { contentRef } = useCanvas()
+  const { popup, setPopup } = React.useContext(CommentPopupContext)
+
+  // Close popup on selection change
+  useEffect(() => { setPopup(null) }, [selectedId, setPopup])
+
+  return (
+    <>
+      {commentPins?.map((pin, i) => (
+        <CommentPinMarker
+          key={pin.id}
+          pin={pin}
+          index={i}
+          contentRef={contentRef}
+          onClick={() => onClickPin?.(pin.id)}
+        />
+      ))}
+
+      {selectedId && onAddComment && !popup && (
+        <AddCommentTrigger
+          contentRef={contentRef}
+          selectedId={selectedId}
+          onOpen={(nodeId, docX, docY) => setPopup({ nodeId, x: docX, y: docY })}
+        />
+      )}
+    </>
+  )
+}
+
+// ═══ Screen-space layer: comment popup (not affected by pan/zoom) ═══
+
+function CommentScreenLayer({
+  onAddComment,
+  userName,
+}: {
+  onAddComment?: (nodeId: string, body: string, pinXRatio: number, pinYRatio: number) => void
+  userName?: string
+}) {
+  const { contentRef, transformRef } = useCanvas()
+  const { popup, setPopup } = React.useContext(CommentPopupContext)
+
+  if (!popup || !onAddComment) return null
+
+  const t = transformRef.current
+  const screenX = popup.x * t.scale + t.x
+  const screenY = popup.y * t.scale + t.y
+
+  return (
+    <CommentPopup
+      x={screenX}
+      y={screenY}
+      userName={userName ?? 'You'}
+      onSubmit={(body) => {
+        let pinXRatio = 0.5, pinYRatio = 0.5
+        if (contentRef.current) {
+          const nodeEl = contentRef.current.querySelector(`[data-pen-id="${popup.nodeId}"]`) as HTMLElement | null
+          const frameEl = contentRef.current.querySelector(':scope > [data-pen-id] [data-pen-id]')?.closest('[data-pen-id]')?.parentElement?.closest('[data-pen-id]') as HTMLElement | null
+            ?? contentRef.current.querySelector(':scope > div > [data-pen-id]') as HTMLElement | null
+          if (nodeEl && frameEl) {
+            const nodeRect = nodeEl.getBoundingClientRect()
+            const frameRect = frameEl.getBoundingClientRect()
+            const fw = frameRect.width || 1
+            const fh = frameRect.height || 1
+            pinXRatio = Math.max(0, Math.min(1, (nodeRect.left - frameRect.left) / fw))
+            pinYRatio = Math.max(0, Math.min(1, (nodeRect.top - frameRect.top) / fh))
+          }
+        }
+        onAddComment(popup.nodeId, body, pinXRatio, pinYRatio)
+        setPopup(null)
+      }}
+      onCancel={() => setPopup(null)}
+    />
   )
 }
 

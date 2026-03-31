@@ -16,8 +16,6 @@ interface CommentsPanelProps {
   onClose?: () => void;
   /** Called when user clicks a comment — canvas scrolls to pin */
   onFocusComment?: (commentId: string) => void;
-  /** Highlighted comment id (from clicking a pin on canvas) */
-  highlightedId?: string | null;
 }
 
 type Filter = 'all' | 'open' | 'resolved';
@@ -42,13 +40,11 @@ export function CommentsPanel({
   versionId,
   onClose,
   onFocusComment,
-  highlightedId,
 }: CommentsPanelProps) {
   const queryClient = useQueryClient();
   const t = useT('comments');
   const [newComment, setNewComment] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const highlightRef = useRef<HTMLDivElement>(null);
 
   const { data: commentList = [] } = useQuery({
     queryKey: ['comments', fileId, frameId, versionId],
@@ -137,15 +133,10 @@ export function CommentsPanel({
         ) : (
           topLevelComments.map((comment: any) => {
             const replies = filtered.filter((c: any) => c.parentCommentId === comment.id);
-            const isHighlighted = comment.id === highlightedId;
             return (
               <div
                 key={comment.id}
-                ref={isHighlighted ? highlightRef : undefined}
-                className={cn(
-                  'flex cursor-pointer flex-col gap-2.5 px-5 py-4 inset-shadow-border-b transition-colors duration-100',
-                  isHighlighted && 'bg-primary-light outline outline-1 -outline-offset-1 outline-primary',
-                )}
+                className="flex cursor-pointer flex-col gap-2.5 px-5 py-4 inset-shadow-border-b transition-colors duration-100 hover:bg-surface"
                 onClick={() => onFocusComment?.(comment.id)}
               >
                 <CommentItem

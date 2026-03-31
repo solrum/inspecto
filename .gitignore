@@ -6,6 +6,7 @@ dist/
 .DS_Store
 coverage/
 .turbo/
+.pids/
 .next/
 .idea/
 .claude/

@@ -91,12 +91,11 @@ export const FramePicker = memo(function FramePicker({ frames, selectedFrameId, 
         if (!listRef.current) return
         const el = listRef.current.querySelector(`[data-layer-id="${autoExpandTo}"]`) as HTMLElement | null
         if (!el) return
-        const listH = listRef.current.clientHeight
-        const elTop = el.offsetTop - listRef.current.offsetTop
-        const elH = el.offsetHeight
-        const targetScroll = elTop - listH / 2 + elH / 2
+        const listRect = listRef.current.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        const elTopInList = elRect.top - listRect.top + listRef.current.scrollTop
+        const targetScroll = elTopInList - listRef.current.clientHeight / 2 + elRect.height / 2
         const currentScroll = listRef.current.scrollTop
-        // Skip scroll if already within 80px of center
         if (Math.abs(targetScroll - currentScroll) > 80) {
           listRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' })
         }
