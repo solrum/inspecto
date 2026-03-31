@@ -239,6 +239,6 @@ const styles = {
     position: 'absolute' as const,
     bottom: 16,
     right: 16,
-    zIndex: 10,
+    zIndex: 20,
   },
 } as const
