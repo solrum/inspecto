@@ -225,14 +225,11 @@ const styles = {
     overflow: 'hidden' as const,
     backgroundColor: '#EDEDF0',
     backgroundImage: 'radial-gradient(circle, #D8D8DC 1px, transparent 1px)',
-    backgroundSize: '20px 20px',
-    backgroundPosition: '40px 40px',
     position: 'relative' as const,
   },
   content: {
     position: 'absolute' as const,
     transformOrigin: '0 0',
-    transform: 'translate(40px, 40px) scale(0.5)',
     willChange: 'transform',
   },
   zoomWrapper: {

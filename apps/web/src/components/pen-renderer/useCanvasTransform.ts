@@ -89,6 +89,25 @@ export function useCanvasTransform({
     })
   }, [])
 
+  // Shared animation helper — set transform with optional CSS transition
+  const animateTransform = useCallback((newTransform: Transform, animate: boolean) => {
+    if (animate && contentRef.current) {
+      contentRef.current.style.transition = 'transform 0.3s ease-out'
+      requestAnimationFrame(() => {
+        transformRef.current = newTransform
+        applyTransform()
+        scheduleZoomDisplay()
+        setTimeout(() => {
+          if (contentRef.current) contentRef.current.style.transition = ''
+        }, 320)
+      })
+    } else {
+      transformRef.current = newTransform
+      applyTransform()
+      scheduleZoomDisplay()
+    }
+  }, [applyTransform, scheduleZoomDisplay])
+
   // Focus on a specific frame — center it in viewport
   const focusFrame = useCallback(
     (frameId: string, animate = false) => {
@@ -103,17 +122,13 @@ export function useCanvasTransform({
       const fh = typeof frame.height === 'number' ? frame.height : 800
 
       const scale = Math.min((cw - 60) / fw, (ch - 60) / fh, 1)
-      const newTransform = {
+      animateTransform({
         x: cw / 2 - (fx + fw / 2) * scale,
         y: ch / 2 - (fy + fh / 2) * scale,
         scale,
-      }
-
-      transformRef.current = newTransform
-      applyTransform()
-      scheduleZoomDisplay()
+      }, animate)
     },
-    [frames, applyTransform, scheduleZoomDisplay]
+    [frames, animateTransform]
   )
 
   // Mount: restore saved transform instantly, OR focus first frame
@@ -159,15 +174,12 @@ export function useCanvasTransform({
     const nodeH = nodeRect.height / scale
 
     // Pan so node is centered in viewport
-    const newTransform = {
+    animateTransform({
       ...transformRef.current,
       x: cw / 2 - (nodeX + nodeW / 2) * scale,
       y: ch / 2 - (nodeY + nodeH / 2) * scale,
-    }
-
-    transformRef.current = newTransform
-    applyTransform()
-  }, [applyTransform])
+    }, animate)
+  }, [animateTransform])
 
   // One-shot focus — only react to focusNodeId changes, not focusNodeById identity
   const prevFocusNodeId = useRef<string | undefined>(undefined)
