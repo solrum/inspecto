@@ -92,6 +92,9 @@ export interface IRenderNode {
   iconColor?: string
   iconSize?: number
 
+  // Transform
+  transform?: string
+
   // Shape-specific
   isEllipse?: boolean          // borderRadius: 50%
   svgGeometry?: string         // SVG path data

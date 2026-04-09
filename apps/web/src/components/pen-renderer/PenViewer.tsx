@@ -103,7 +103,18 @@ export function PenViewer({
   )
   const [internalSelectedNode, setInternalSelectedNode] = useState<PenChild | null>(null)
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null)
-  const [activeTheme, setActiveTheme] = useState<PenTheme>(defaultTheme)
+  // Initialize activeTheme with first value of each axis from doc.themes
+  const [activeTheme, setActiveTheme] = useState<PenTheme>(() => {
+    const initial: PenTheme = { ...defaultTheme }
+    if (doc.themes) {
+      for (const [axis, values] of Object.entries(doc.themes)) {
+        if (!(axis in initial) && values.length > 0) {
+          initial[axis] = values[0]
+        }
+      }
+    }
+    return initial
+  })
   const focusCounter = useRef(0)
   const [focusFrame, setFocusFrame] = useState<string | undefined>(
     savedTransform ? undefined : firstFrameId ?? undefined
@@ -272,6 +283,7 @@ export function PenViewer({
             onUserTransform={() => setNeedsRefocus(true)}
             savedTransform={savedTransform}
             onTransformChange={onTransformChange}
+            onThemeChange={handleThemeChange}
             onPrevFrame={onPrevFrame}
             onNextFrame={onNextFrame}
             onExpandFrame={!isSingleFrame && config.onNavigateFrame && selectedFrameId ? () => config.onNavigateFrame!(selectedFrameId) : null}

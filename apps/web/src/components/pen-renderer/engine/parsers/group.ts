@@ -1,7 +1,7 @@
 import type { PenChild } from '../../types'
 import type { VarResolver } from '../../resolver'
 import type { INodeParser, IRenderNode, ChildParser } from '../interfaces'
-import { resolveSize, resolveEffects, resolveLayoutProps } from '../helpers'
+import { resolveSize, resolveEffects, resolveLayoutProps, resolveTransform } from '../helpers'
 
 export class GroupParser implements INodeParser {
   canParse(node: PenChild) { return node.type === 'group' }
@@ -23,11 +23,12 @@ export class GroupParser implements INodeParser {
     resolveLayoutProps(result, n, resolver, 'none')
     resolveSize(result, n.width, n.height, resolver, parentLayout)
     resolveEffects(result, n.effect, resolver)
+    resolveTransform(result, n, resolver)
 
     const ownLayout = result.layout
     if (n.children?.length) {
       result.children = n.children
-        .filter((c: any) => c.enabled !== false)
+        .filter((c: any) => resolver.resolveBoolean(c.enabled) !== false)
         .map((child: PenChild, i: number) => parseChild(child, ownLayout, i))
     }
 

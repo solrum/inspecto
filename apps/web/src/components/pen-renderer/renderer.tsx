@@ -42,7 +42,7 @@ export const PenDocumentRenderer = memo(function PenDocumentRenderer({
 
   const renderTrees = useMemo(() => {
     return doc.children
-      .filter((child: any) => child.enabled !== false)
+      .filter((child: any) => resolver.resolveBoolean(child.enabled) !== false)
       .map((child, i) => factory.parse(child, resolver, 'none', i))
   }, [doc.children, factory, resolver])
 

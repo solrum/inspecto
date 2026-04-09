@@ -1,7 +1,7 @@
 import type { PenChild } from '../../types'
 import type { VarResolver } from '../../resolver'
 import type { INodeParser, IRenderNode, ChildParser } from '../interfaces'
-import { resolveSize, resolveBackgroundFill, resolveStroke, resolveCornerRadius, resolveEffects, resolveLayoutProps } from '../helpers'
+import { resolveSize, resolveBackgroundFill, resolveStroke, resolveCornerRadius, resolveEffects, resolveLayoutProps, resolveTransform } from '../helpers'
 
 export class FrameParser implements INodeParser {
   canParse(node: PenChild) { return node.type === 'frame' }
@@ -26,6 +26,7 @@ export class FrameParser implements INodeParser {
     resolveStroke(result, n.stroke, resolver)
     resolveCornerRadius(result, n.cornerRadius, resolver)
     resolveEffects(result, n.effect, resolver)
+    resolveTransform(result, n, resolver)
 
     if (n.opacity !== undefined) {
       const op = resolver.resolveNumber(n.opacity)
@@ -36,7 +37,7 @@ export class FrameParser implements INodeParser {
     const ownLayout = result.layout
     if (n.children?.length) {
       result.children = n.children
-        .filter((c: any) => c.enabled !== false)
+        .filter((c: any) => resolver.resolveBoolean(c.enabled) !== false)
         .map((child: PenChild, i: number) => parseChild(child, ownLayout, i))
     }
 

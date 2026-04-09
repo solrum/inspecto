@@ -10,6 +10,7 @@ import type {
   NumberOrVariable,
   ColorOrVariable,
   StringOrVariable,
+  BooleanOrVariable,
 } from './types'
 
 // ---- Theme resolution ----
@@ -128,6 +129,34 @@ export class VarResolver {
         }
       }
       return result?.startsWith('$') ? this.resolveString(result) : result
+    }
+
+    return undefined
+  }
+
+  // Resolve a boolean variable: "$isVisible" | boolean -> boolean
+  resolveBoolean(val: BooleanOrVariable | undefined): boolean | undefined {
+    if (val === undefined) return undefined
+    if (typeof val === 'boolean') return val
+    if (typeof val !== 'string') return undefined
+    if (!val.startsWith('$')) return undefined
+
+    const v = this.resolveVar(val)
+    if (!v || v.type !== 'boolean') return undefined
+
+    if (typeof v.value === 'boolean') return v.value
+
+    // themed array
+    if (Array.isArray(v.value)) {
+      let result: boolean | undefined
+      for (const entry of v.value) {
+        if (this.themeMatches(entry.theme)) {
+          const entryVal = entry.value
+          if (typeof entryVal === 'boolean') result = entryVal
+          else if (typeof entryVal === 'string') result = this.resolveBoolean(entryVal)
+        }
+      }
+      return result
     }
 
     return undefined

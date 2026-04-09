@@ -82,23 +82,32 @@ export function resolveBackgroundFill(
   }
 
   if (typeof single === 'object' && 'type' in single) {
+    const fillEnabled = resolver.resolveBoolean((single as any).enabled)
+    if (fillEnabled === false) return
+
     if (single.type === 'color') {
       const color = resolver.resolveColor((single as any).color)
       if (color) target.backgroundColor = color
     } else if (single.type === 'gradient') {
       const grad = single as any
+      const gradEnabled = resolver.resolveBoolean(grad.enabled)
+      if (gradEnabled === false) return
       if (grad.colors?.length) {
+        const gradOpacity = resolver.resolveNumber(grad.opacity)
         const stops = grad.colors.map((s: any) => {
           const c = resolver.resolveColor(s.color) ?? '#000'
-          const p = typeof s.position === 'number' ? s.position * 100 : 0
+          const p = (resolver.resolveNumber(s.position) ?? 0) * 100
           return `${c} ${p}%`
         }).join(', ')
-        const rot = typeof grad.rotation === 'number' ? grad.rotation : 0
+        const rot = resolver.resolveNumber(grad.rotation) ?? 0
+        let gradientCSS: string
         if (grad.gradientType === 'radial') {
-          target.background = `radial-gradient(circle, ${stops})`
+          gradientCSS = `radial-gradient(circle, ${stops})`
         } else {
-          target.background = `linear-gradient(${180 - rot}deg, ${stops})`
+          gradientCSS = `linear-gradient(${180 - rot}deg, ${stops})`
         }
+        target.background = gradientCSS
+        if (gradOpacity !== undefined && gradOpacity < 1) target.opacity = gradOpacity
       }
     } else if (single.type === 'image') {
       const img = single as any
@@ -107,6 +116,8 @@ export function resolveBackgroundFill(
       target.backgroundSize = modeMap[img.mode ?? 'fill'] ?? 'cover'
       target.backgroundPosition = 'center'
       target.backgroundRepeat = 'no-repeat'
+      const imgOpacity = resolver.resolveNumber(img.opacity)
+      if (imgOpacity !== undefined && imgOpacity < 1) target.opacity = imgOpacity
     }
   }
 }
@@ -120,8 +131,12 @@ export function resolveForegroundFill(
   if (!fill) return undefined
   const single = Array.isArray(fill) ? fill[0] : fill
   if (typeof single === 'string') return resolver.resolveColor(single)
-  if (typeof single === 'object' && 'type' in single && single.type === 'color') {
-    return resolver.resolveColor((single as any).color)
+  if (typeof single === 'object' && 'type' in single) {
+    const enabled = resolver.resolveBoolean((single as any).enabled)
+    if (enabled === false) return undefined
+    if (single.type === 'color') {
+      return resolver.resolveColor((single as any).color)
+    }
   }
   return undefined
 }
@@ -209,20 +224,23 @@ export function resolveEffects(
   const backdropFilters: string[] = []
 
   for (const e of list) {
+    const enabled = resolver.resolveBoolean((e as any).enabled)
+    if (enabled === false) continue
+
     if (e.type === 'shadow') {
       const s = e as any
-      const x = typeof s.offset?.x === 'number' ? s.offset.x : 0
-      const y = typeof s.offset?.y === 'number' ? s.offset.y : 0
-      const blur = typeof s.blur === 'number' ? s.blur : 0
-      const spread = typeof s.spread === 'number' ? s.spread : 0
+      const x = resolver.resolveNumber(s.offset?.x) ?? 0
+      const y = resolver.resolveNumber(s.offset?.y) ?? 0
+      const blur = resolver.resolveNumber(s.blur) ?? 0
+      const spread = resolver.resolveNumber(s.spread) ?? 0
       const color = typeof s.color === 'string' ? (resolver.resolveColor(s.color) ?? 'rgba(0,0,0,0.25)') : 'rgba(0,0,0,0.25)'
       const inset = s.shadowType === 'inner' ? 'inset ' : ''
       shadows.push(`${inset}${x}px ${y}px ${blur}px ${spread}px ${color}`)
     } else if (e.type === 'blur') {
-      const r = typeof (e as any).radius === 'number' ? (e as any).radius : 0
+      const r = resolver.resolveNumber((e as any).radius) ?? 0
       if (r > 0) filters.push(`blur(${r}px)`)
     } else if (e.type === 'background_blur') {
-      const r = typeof (e as any).radius === 'number' ? (e as any).radius : 0
+      const r = resolver.resolveNumber((e as any).radius) ?? 0
       if (r > 0) backdropFilters.push(`blur(${r}px)`)
     }
   }
@@ -265,7 +283,29 @@ export function resolveLayoutProps(
     target.padding = resolver.resolvePadding(node.padding)
   }
 
-  if (node.clip) target.overflow = 'hidden'
+  if (resolver.resolveBoolean(node.clip) === true) target.overflow = 'hidden'
+}
+
+// ─── Transform (rotation, flip) ───
+
+export function resolveTransform(
+  target: Partial<IRenderNode>,
+  node: any,
+  resolver: VarResolver,
+) {
+  const transforms: string[] = []
+
+  const rotation = resolver.resolveNumber(node.rotation)
+  if (rotation !== undefined && rotation !== 0) {
+    transforms.push(`rotate(${rotation}deg)`)
+  }
+
+  const flipX = resolver.resolveBoolean(node.flipX)
+  const flipY = resolver.resolveBoolean(node.flipY)
+  if (flipX === true) transforms.push('scaleX(-1)')
+  if (flipY === true) transforms.push('scaleY(-1)')
+
+  if (transforms.length) target.transform = transforms.join(' ')
 }
 
 // ─── Text Content Extractor ───

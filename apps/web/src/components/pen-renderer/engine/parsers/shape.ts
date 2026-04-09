@@ -1,7 +1,7 @@
 import type { PenChild } from '../../types'
 import type { VarResolver } from '../../resolver'
 import type { INodeParser, IRenderNode, ChildParser } from '../interfaces'
-import { resolveSize, resolveBackgroundFill, resolveStroke, resolveCornerRadius, resolveEffects } from '../helpers'
+import { resolveSize, resolveBackgroundFill, resolveStroke, resolveCornerRadius, resolveEffects, resolveTransform } from '../helpers'
 
 /** Handles: rectangle, ellipse, polygon, path, line */
 export class ShapeParser implements INodeParser {
@@ -27,6 +27,7 @@ export class ShapeParser implements INodeParser {
     resolveBackgroundFill(result, n.fill, resolver)
     resolveStroke(result, n.stroke, resolver)
     resolveEffects(result, n.effect, resolver)
+    resolveTransform(result, n, resolver)
 
     if (n.opacity !== undefined) {
       const op = resolver.resolveNumber(n.opacity)

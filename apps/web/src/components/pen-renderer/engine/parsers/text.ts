@@ -1,7 +1,7 @@
 import type { PenChild } from '../../types'
 import type { VarResolver } from '../../resolver'
 import type { INodeParser, IRenderNode, ChildParser } from '../interfaces'
-import { resolveSize, resolveForegroundFill, resolveEffects, extractTextContent } from '../helpers'
+import { resolveSize, resolveForegroundFill, resolveEffects, extractTextContent, resolveTransform } from '../helpers'
 
 export class TextParser implements INodeParser {
   canParse(node: PenChild) { return node.type === 'text' }
@@ -55,8 +55,8 @@ export class TextParser implements INodeParser {
       result.textAlign = map[n.textAlign]
     }
 
-    if (n.underline) result.textDecoration = 'underline'
-    if (n.strikethrough) result.textDecoration = 'line-through'
+    if (resolver.resolveBoolean(n.underline) === true) result.textDecoration = 'underline'
+    if (resolver.resolveBoolean(n.strikethrough) === true) result.textDecoration = 'line-through'
 
     // textGrowth controls sizing
     const tg = n.textGrowth ?? 'auto'
@@ -73,6 +73,7 @@ export class TextParser implements INodeParser {
 
     // Effects (shadows on text)
     resolveEffects(result, n.effect, resolver)
+    resolveTransform(result, n, resolver)
 
     if (n.opacity !== undefined) {
       const op = resolver.resolveNumber(n.opacity)

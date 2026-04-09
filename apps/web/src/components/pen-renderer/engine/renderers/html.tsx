@@ -78,7 +78,10 @@ const RenderNode = memo(function RenderNode({ node }: { node: IRenderNode }) {
   const style = useMemo(() => {
     const s = buildCSS(node)
     if (isSelected) {
-      return { ...s, outline: '2px solid #7C3AED', outlineOffset: '1px' }
+      const sel: React.CSSProperties = { ...s, outline: '2px solid #7C3AED', outlineOffset: '1px', zIndex: 999 }
+      // zIndex requires positioned element
+      if (!sel.position) sel.position = 'relative'
+      return sel
     }
     return s
   }, [node, isSelected])
@@ -190,10 +193,11 @@ function buildCSS(node: IRenderNode): CSSProperties {
   if (node.boxShadow) s.boxShadow = node.boxShadow
   if (node.outline) s.outline = node.outline
 
-  // Opacity & filters
+  // Opacity, filters & transform
   if (node.opacity !== undefined) s.opacity = node.opacity
   if (node.filter) s.filter = node.filter
   if (node.backdropFilter) s.backdropFilter = node.backdropFilter
+  if (node.transform) s.transform = node.transform
 
   // Text
   if (node.color) s.color = node.color

@@ -1,7 +1,7 @@
 import type { PenChild } from '../../types'
 import type { VarResolver } from '../../resolver'
 import type { INodeParser, IRenderNode, ChildParser } from '../interfaces'
-import { resolveSize, resolveForegroundFill, resolveEffects } from '../helpers'
+import { resolveSize, resolveForegroundFill, resolveEffects, resolveTransform } from '../helpers'
 
 export class IconParser implements INodeParser {
   canParse(node: PenChild) { return node.type === 'icon_font' }
@@ -23,6 +23,7 @@ export class IconParser implements INodeParser {
 
     resolveSize(result, n.width, n.height, resolver, parentLayout)
     resolveEffects(result, n.effect, resolver)
+    resolveTransform(result, n, resolver)
 
     // Icon color (fill = foreground, NOT background)
     result.iconColor = resolveForegroundFill(n.fill, resolver) ?? 'currentColor'

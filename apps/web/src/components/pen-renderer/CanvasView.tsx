@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, type ReactNode } from 'react'
+import React, { useState, useEffect, useMemo, memo, type ReactNode } from 'react'
 import type { PenDocument, PenChild, PenTheme } from './types'
 import { VarResolver } from './resolver'
 import { PenDocumentRenderer } from './renderer'
@@ -34,6 +34,8 @@ interface CanvasViewProps {
   children?: ReactNode
   /** Children rendered inside the canvas container but outside content (screen space — fixed position) */
   screenChildren?: ReactNode
+  /** Theme change callback — when provided, shows theme switcher on canvas */
+  onThemeChange?: (axis: string, value: string) => void
 }
 
 const DEFAULT_CANVAS_BG = '#EDEDF0'
@@ -57,6 +59,7 @@ export function CanvasView({
   onExpandFrame,
   children,
   screenChildren,
+  onThemeChange,
 }: CanvasViewProps) {
   const {
     containerRef,
@@ -91,9 +94,21 @@ export function CanvasView({
     onCanvasBgChange?.(color)
   }
 
+  // Ensure activeTheme has defaults for all doc.themes axes
+  const resolvedTheme = useMemo(() => {
+    if (!doc.themes) return activeTheme
+    const merged: PenTheme = { ...activeTheme }
+    for (const [axis, values] of Object.entries(doc.themes)) {
+      if (!(axis in merged) && values.length > 0) {
+        merged[axis] = values[0]
+      }
+    }
+    return merged
+  }, [activeTheme, doc.themes])
+
   const resolver = useMemo(
-    () => new VarResolver(doc.variables, activeTheme),
-    [doc.variables, activeTheme]
+    () => new VarResolver(doc.variables, resolvedTheme),
+    [doc.variables, resolvedTheme]
   )
 
   // Memoized frame labels
@@ -204,6 +219,17 @@ export function CanvasView({
             </div>
           </div>
 
+          {/* Theme switcher — bottom-left */}
+          {onThemeChange && doc.themes && Object.keys(doc.themes).length > 0 && (
+            <div style={styles.themeWrapper}>
+              <ThemeSwitcher
+                themes={doc.themes}
+                activeTheme={resolvedTheme}
+                onChange={onThemeChange}
+              />
+            </div>
+          )}
+
           {/* Frame navigation hover zones — direct children of canvas container */}
           {onPrevFrame && <FrameNavZone side="left" onClick={onPrevFrame} />}
           {onNextFrame && <FrameNavZone side="right" onClick={onNextFrame} />}
@@ -238,4 +264,101 @@ const styles = {
     right: 16,
     zIndex: 20,
   },
+  themeWrapper: {
+    position: 'absolute' as const,
+    bottom: 16,
+    left: 16,
+    zIndex: 20,
+  },
+} as const
+
+// ─── Theme Switcher ───
+
+const ThemeSwitcher = memo(function ThemeSwitcher({
+  themes,
+  activeTheme,
+  onChange,
+}: {
+  themes: Record<string, string[]>
+  activeTheme: PenTheme
+  onChange: (axis: string, value: string) => void
+}) {
+  const axes = Object.entries(themes)
+  if (!axes.length) return null
+
+  return (
+    <div style={themeSwitcherStyles.container}>
+      {axes.map(([axis, values]) => (
+        <div key={axis} style={themeSwitcherStyles.axisRow}>
+          <span style={themeSwitcherStyles.axisLabel}>{axis}</span>
+          <div style={themeSwitcherStyles.pillGroup}>
+            {values.map((val) => {
+              const isActive = activeTheme[axis] === val
+              return (
+                <button
+                  key={val}
+                  onClick={() => onChange(axis, val)}
+                  style={{
+                    ...themeSwitcherStyles.pill,
+                    ...(isActive ? themeSwitcherStyles.pillActive : themeSwitcherStyles.pillInactive),
+                  }}
+                >
+                  {val}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+})
+
+const themeSwitcherStyles = {
+  container: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '6px 10px',
+    borderRadius: 'var(--radius-md)',
+    backgroundColor: 'var(--color-surface-elevated)',
+    boxShadow: 'inset 0 0 0 1px var(--color-border), 0 2px 8px 0 var(--color-shadow)',
+  } as React.CSSProperties,
+  axisRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  } as React.CSSProperties,
+  axisLabel: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: 'var(--color-foreground-muted)',
+    textTransform: 'capitalize' as const,
+  } as React.CSSProperties,
+  pillGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    padding: 2,
+    borderRadius: 'var(--radius-sm)',
+    backgroundColor: 'var(--color-background)',
+  } as React.CSSProperties,
+  pill: {
+    padding: '3px 10px',
+    fontSize: 11,
+    fontWeight: 500,
+    border: 'none',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    textTransform: 'capitalize' as const,
+  } as React.CSSProperties,
+  pillActive: {
+    backgroundColor: 'var(--color-primary)',
+    color: 'var(--color-primary-foreground)',
+  } as React.CSSProperties,
+  pillInactive: {
+    backgroundColor: 'transparent',
+    color: 'var(--color-foreground-secondary)',
+  } as React.CSSProperties,
 } as const
