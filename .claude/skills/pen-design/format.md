@@ -15,6 +15,7 @@
 |-------|------|-------------|
 | `version` | `"2.9"` | Format version |
 | `themes` | `{ [axis]: string[] }` | Multi-axis theme definitions |
+| `imports` | `{ [alias]: string }` | Import components from other .pen files |
 | `variables` | `{ [name]: VariableDef }` | Design tokens |
 | `children` | `Node[]` | Top-level nodes (frames = screens/artboards) |
 
@@ -32,7 +33,7 @@
 | Type | Notes |
 |------|-------|
 | `rectangle` | `fill`, `stroke`, `cornerRadius` |
-| `ellipse` | Always renders as circle/oval (`borderRadius: 50%`) |
+| `ellipse` | Circle/oval (`borderRadius: 50%`). Optional: `innerRadius` (donut), `startAngle`/`sweepAngle` (arcs) |
 | `line` | Height defaults to `1`, `flexShrink: 0`. Fill = line color. |
 | `polygon` | `polygonCount` sides |
 | `path` | `geometry` (SVG path data), `fillRule` |
@@ -64,11 +65,11 @@
 id: string          — unique identifier (no slashes)
 name?: string       — display name
 type: string        — node type
-enabled?: boolean   — false = skip entirely (render + layout)
-opacity?: number    — 0.0–1.0
-rotation?: number   — degrees
-flipX?: boolean
-flipY?: boolean
+enabled?: BooleanOrVariable — false = skip entirely (render + layout). Can be "$var"!
+opacity?: NumberOrVariable  — 0.0–1.0
+rotation?: NumberOrVariable — degrees
+flipX?: BooleanOrVariable
+flipY?: BooleanOrVariable
 layoutPosition?: "auto" | "absolute"
 x?: number          — position (used when absolute)
 y?: number
@@ -89,8 +90,10 @@ metadata?: { type: string, ... }
 | `letterSpacing` | number | — | Pixels |
 | `lineHeight` | number | — | Multiplier or absolute |
 | `textAlign` | string | `"left"` | `left` / `center` / `right` / `justify` |
-| `underline` | boolean | false | |
-| `strikethrough` | boolean | false | |
+| `textAlignVertical` | string | `"top"` | `top` / `middle` / `bottom` — vertical alignment within text box |
+| `underline` | BooleanOrVariable | false | Can be `"$var"` |
+| `strikethrough` | BooleanOrVariable | false | Can be `"$var"` |
+| `href` | string | — | Makes text a link. Render as `<a>` on web. |
 | `textGrowth` | string | `"auto"` | `auto` / `fixed-width` / `fixed-width-height` |
 
 ### Rich Text Content
@@ -118,4 +121,5 @@ metadata?: { type: string, ... }
 | `iconFontFamily` | `"lucide"` | Icon font family |
 | `iconFontName` | — | Icon identifier (e.g. `"arrow-right"`) |
 | `fill` | — | **Tint color** (foreground!) |
+| `weight` | — | Icon weight (NumberOrVariable) — thin/regular/bold variant |
 | `width` / `height` | `16` | Icon size |

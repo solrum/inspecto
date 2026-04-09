@@ -15,6 +15,8 @@ import { HTMLRendererComponent } from './engine/renderers/html'
 
 export interface PenRendererProps {
   document: PenDocument
+  /** Full document children for component registry (used in single-frame mode where document.children is filtered) */
+  allChildren?: PenChild[]
   resolver: VarResolver
   selectedId?: string | null
   onSelectNode?: (id: string, node: PenChild) => void
@@ -30,15 +32,18 @@ const staticScaleStyle = { position: 'relative' as const, transformOrigin: 'top 
 
 export const PenDocumentRenderer = memo(function PenDocumentRenderer({
   document: doc,
+  allChildren,
   resolver,
   selectedId = null,
   onSelectNode,
   scale = 1,
 }: PenRendererProps) {
+  // Build registry from ALL children (not filtered view) so refs resolve in single-frame mode
+  const registrySource = allChildren ?? doc.children
   const factory = useMemo(() => {
-    const registry = buildComponentRegistry(doc.children)
+    const registry = buildComponentRegistry(registrySource)
     return createParserFactory(registry)
-  }, [doc.children])
+  }, [registrySource])
 
   const renderTrees = useMemo(() => {
     return doc.children

@@ -14,6 +14,8 @@ export type { CommentPin } from './CommentOverlay'
 
 interface CanvasViewProps {
   document: PenDocument
+  /** Full document children for component registry (single-frame mode passes filtered doc) */
+  allChildren?: PenChild[]
   activeTheme?: PenTheme
   onSelectNode?: (id: string, node: PenChild) => void
   selectedId?: string | null
@@ -60,6 +62,7 @@ export function CanvasView({
   children,
   screenChildren,
   onThemeChange,
+  allChildren,
 }: CanvasViewProps) {
   const {
     containerRef,
@@ -160,6 +163,7 @@ export function CanvasView({
 
             <PenDocumentRenderer
               document={doc}
+              allChildren={allChildren}
               resolver={resolver}
               selectedId={selectedId}
               onSelectNode={onSelectNode}

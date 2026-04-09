@@ -271,6 +271,7 @@ export function PenViewer({
         <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
           <CanvasView
             document={isSingleFrame ? viewDoc : doc}
+            allChildren={isSingleFrame ? doc.children : undefined}
             activeTheme={activeTheme}
             selectedId={config.readOnly ? null : selectedNodeId}
             onSelectNode={config.readOnly ? undefined : handleSelectFromCanvas}

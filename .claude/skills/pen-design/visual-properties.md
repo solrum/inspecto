@@ -14,12 +14,17 @@ This distinction is the #1 source of rendering bugs. Always check `node.type` be
 
 ## Fill Types
 
+Each fill object can have:
+- `enabled?: BooleanOrVariable` — toggle this fill layer on/off (resolve via variable!)
+- `blendMode?: PenBlendMode` — blend mode (`normal`, `multiply`, `overlay`, `screen`, etc.)
+- `opacity?: NumberOrVariable` — fill-layer opacity (gradient/image only)
+
 ### Color
 
 ```json
 "#7C3AED"
 // or
-{ "type": "color", "color": "#7C3AED" }
+{ "type": "color", "enabled": true, "blendMode": "normal", "color": "#7C3AED" }
 // or variable
 "$color-primary"
 ```
@@ -38,9 +43,12 @@ This distinction is the #1 source of rendering bugs. Always check `node.type` be
 }
 ```
 
-- `gradientType`: `linear` | `radial` | `angular`
-- `rotation`: degrees. **CSS conversion: `180 - pen_rotation`**
-- `position`: 0.0–1.0 (multiply by 100 for CSS %)
+- `gradientType`: `linear` | `radial` | `angular` (angular → CSS `conic-gradient`)
+- `rotation`: degrees (NumberOrVariable). **CSS conversion: `180 - pen_rotation`**
+- `position`: 0.0–1.0 (NumberOrVariable, multiply by 100 for CSS %)
+- `center`: `{ x?, y? }` — radial/angular gradient center point (0.0–1.0)
+- `size`: `{ width?, height? }` — gradient extent
+- `opacity`: NumberOrVariable — fill-layer opacity
 
 ### Image
 
@@ -79,6 +87,15 @@ When `fill` is an array:
 | `center` | Standard border | Yes |
 | `inside` | Inset shadow (`box-shadow: inset 0 0 0 Npx color`) | No |
 | `outside` | Outline (`outline: Npx solid color`) | No |
+
+### Stroke Style Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `join` | `'miter' \| 'bevel' \| 'round'` | Line join style |
+| `cap` | `'none' \| 'round' \| 'square'` | Line cap style |
+| `miterAngle` | `NumberOrVariable` | Miter limit angle |
+| `dashPattern` | `number[]` | Dash/gap pattern (e.g. `[4, 2]`) → CSS `border-style: dashed` or SVG `stroke-dasharray` |
 
 ### Per-Side Thickness
 
@@ -121,6 +138,8 @@ When `fill` is an array:
 | `shadow` (inner) | `box-shadow: inset ...` | Custom overlay | Custom `drawBehind` | Custom painter | Inset darker `AddRectFilled` |
 | `blur` | `filter: blur(Rpx)` | `.blur(radius: R)` | `Modifier.blur(R.dp)` | `ImageFilter.blur(...)` | Not native — skip or render-to-texture |
 | `background_blur` | `backdrop-filter: blur(Rpx)` | `.background(.ultraThinMaterial)` | Limited | `BackdropFilter(...)` | Not native — semi-transparent overlay |
+
+Each effect has `enabled?: BooleanOrVariable` — skip the effect if `resolveBoolean(enabled) === false`.
 
 Multiple shadows: concatenate with commas in CSS, stack in native.
 

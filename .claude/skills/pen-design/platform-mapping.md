@@ -19,8 +19,8 @@ Dear ImGui is an **immediate-mode** GUI library — there is no retained node tr
 | `layout: "vertical"` | `display:flex; flex-direction:column` | `VStack(spacing: gap)` | `Column(verticalArrangement=...)` | `Column()` | `BeginGroup()` + children sequentially |
 | `layout: "none"` | `position:relative` + children absolute | `ZStack` | `Box` | `Stack` | `SetCursorPos()` per child |
 | `position: "absolute"` | `position:absolute; top:y; left:x` | `.position(x:y:)` | `Modifier.offset(x.dp, y.dp)` | `Positioned(left:x, top:y)` | `SetCursorPos(ImVec2(x, y))` |
-| `gap: N` | `gap: Npx` | `spacing: N` | `spacedBy(N.dp)` | `SizedBox` between children | `ImGui::Dummy(ImVec2(N, 0))` (h) or `ImGui::Dummy(ImVec2(0, N))` (v) |
-| `padding: [t,r,b,l]` | `padding: tpx rpx bpx lpx` | `.padding(EdgeInsets(...))` | `Modifier.padding(t,r,b,l)` | `EdgeInsets.only(...)` | `PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(l, t))` + offset cursor |
+| `gap: N` | `gap: Npx` | `spacing: N` | `spacedBy(N.dp)` | `SizedBox` between children | `Dummy(ImVec2(N, 0))` (h) or `Dummy(ImVec2(0, N))` (v) between items. **IMPORTANT:** Also set `ItemSpacing` to `(0,0)` so Dummy is the sole gap source. |
+| `padding: [t,r,b,l]` | `padding: tpx rpx bpx lpx` | `.padding(EdgeInsets(...))` | `Modifier.padding(t,r,b,l)` | `EdgeInsets.only(...)` | **For cards/widgets:** `PushStyleVar(WindowPadding, ImVec2(l, t))` before `BeginChild`. **For page-level containers:** use manual padding — `Dummy(0, t)` top, `SetCursorPosX(l)` left, constrain child width to `avail - l - r`. See "ImGui Padding Strategies" below. |
 | `overflow: "hidden"` | `overflow: hidden` | `.clipped()` | `Modifier.clip(shape)` | `clipBehavior: Clip.hardEdge` | `PushClipRect(min, max, true)` / `PopClipRect()` |
 
 ### Justify Content
@@ -116,7 +116,7 @@ For per-corner radii, use multiple overlapping `AddRectFilled` calls or a custom
 | **iOS** | `Image(systemName:name).foregroundColor(tint).frame(width:size, height:size)` |
 | **Android** | `Icon(painter=painterResource(id), tint=color, modifier=Modifier.size(size.dp))` |
 | **Flutter** | `Icon(iconData, color:tint, size:size)` or `SvgPicture.asset(colorFilter:...)` |
-| **ImGui** | Load icon font (e.g. FontAwesome, MaterialIcons) via `AddFontFromFileTTF` with glyph ranges, then `PushFont(iconFont); Text(ICON_GLYPH); PopFont();` Tint via `PushStyleColor(ImGuiCol_Text, tint)` |
+| **ImGui** | **Option A (best):** Load icon font (Lucide/FontAwesome) via `AddFontFromFileTTF` with glyph ranges + IconFontCppHeaders. **Option B (no dependencies):** Draw icons via `ImDrawList` using lines, rects, circles — resolution independent. See "ImGui Icon Drawing" below. |
 
 ## SVG Path
 
@@ -127,3 +127,233 @@ For per-corner radii, use multiple overlapping `AddRectFilled` calls or a custom
 | **Android** | `Canvas { drawPath(parseSvgPath(geometry), paint) }` |
 | **Flutter** | `CustomPaint` with `Path` or `flutter_svg` |
 | **ImGui** | Parse SVG path → `ImDrawList` calls: `PathLineTo()`, `PathBezierCubicCurveTo()`, `PathFillConvex()` or `AddConvexPolyFilled()`. For complex paths, rasterize to texture offline. |
+
+---
+
+## ImGui Deep Dive — Practical Patterns
+
+These sections address real pitfalls discovered during .pen → ImGui implementation.
+
+### ImGui Padding Strategies
+
+`WindowPadding` works reliably for **card-like children** (small, auto-sized). For **page-level scrollable containers**, it is unreliable due to parent context inheritance. Use manual padding instead.
+
+**Card padding (reliable):**
+```cpp
+// Works: WindowPadding applied to a self-contained card child
+PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 24));
+PushStyleVar(ImGuiStyleVar_ChildRounding, 16);
+BeginChild("card", ImVec2(w, 0), AutoResizeY | Borders);
+  // Content is correctly padded 24px on all sides
+EndChild();
+PopStyleVar(2);
+```
+
+**Page-level padding (manual — required):**
+```cpp
+// WindowPadding may be ignored or overridden by parent context.
+// Instead, use explicit cursor manipulation:
+BeginChild("##scrollArea", ImVec2(0, 0)); // scrollable, full width
+
+Dummy(ImVec2(0, 32));  // top padding
+
+float padH = 48.0f;
+float contentW = GetWindowWidth() - padH * 2;
+
+// Each section: indent + constrain width
+SetCursorPosX(padH);
+BeginChild("##section", ImVec2(contentW, 0), AutoResizeY);
+  RenderCard(); // card uses GetContentRegionAvail().x → gets contentW
+EndChild();
+
+Dummy(ImVec2(0, 32));  // bottom padding
+EndChild();
+```
+
+**Why manual?** ImGui's `WindowPadding` is consumed at `BeginChild` time from the **current style stack**, which may have been reset by a parent's push/pop. Nested children amplify this problem. Manual `Dummy` + `SetCursorPosX` is deterministic and always correct.
+
+### ImGui Scrollbar Positioning
+
+**Problem:** Nested children each create their own scrollbar. If content padding is achieved via an inner child, the scrollbar appears *inside* the padded area instead of at the viewport edge.
+
+**Rule:** Only ONE level should scroll — the outermost content child. Inner sections must use `ImGuiChildFlags_AutoResizeY` (no scrollbar).
+
+```
+CORRECT:
+  MainContent (scrollable, full width)  ← scrollbar at right edge
+    ├── [manual padding via Dummy/SetCursorPosX]
+    ├── CardSection (AutoResizeY, width-constrained)  ← no scrollbar
+    └── CardSection (AutoResizeY, width-constrained)  ← no scrollbar
+
+WRONG:
+  MainContent (not scrollable)
+    └── InnerPadded (scrollable, width-constrained)  ← scrollbar inside padding!
+```
+
+### ImGui Gap Implementation
+
+.pen's `gap` property adds spacing between siblings **but not before the first or after the last child**. ImGui has no equivalent.
+
+**Pattern:** Set `ItemSpacing` to `(0, 0)` and use explicit `Dummy(0, gap)` between items:
+```cpp
+PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+RenderCard1();
+Dummy(ImVec2(0, 24));  // gap
+RenderCard2();
+Dummy(ImVec2(0, 24));  // gap
+RenderCard3();
+// NO dummy after last item
+PopStyleVar();
+```
+
+**Why not just use ItemSpacing?** `ItemSpacing` adds space after EVERY widget including `Dummy`, making gap values unpredictable. Zeroing it and using explicit Dummies gives exact control.
+
+### ImGui Baseline Alignment (Mixed Font Sizes)
+
+.pen `alignItems: end` on a horizontal container with mixed font sizes means **baseline alignment**. `ImGui::SameLine()` aligns at **top**, not baseline.
+
+**Solution:** Use `ImDrawList::AddText()` directly to position text at computed baselines:
+```cpp
+ImVec2 pos = GetCursorScreenPos();
+ImDrawList* dl = GetWindowDrawList();
+
+// Big text
+PushFont(fontPrice); // 36px
+ImVec2 bigSize = CalcTextSize("$12");
+dl->AddText(fontPrice, fontPrice->FontSize, pos, bigCol, "$12");
+PopFont();
+
+// Small text — aligned to big text's baseline
+PushFont(fontBody); // 14px
+ImVec2 smallSize = CalcTextSize("/ month");
+float baseline = pos.y + bigSize.y - smallSize.y - 2.0f; // align bottoms
+dl->AddText(fontBody, fontBody->FontSize,
+            ImVec2(pos.x + bigSize.x + 6, baseline), smallCol, "/ month");
+PopFont();
+
+// Advance cursor past both
+Dummy(ImVec2(bigSize.x + 6 + smallSize.x, bigSize.y));
+```
+
+### ImGui Font Loading
+
+Each unique `(fontFamily, fontSize, fontWeight)` tuple in the design must be a separate `ImFont*`. Pre-load all during init.
+
+**Glyph ranges:** Default ImGui only loads Basic Latin (0x0020-0x00FF). For em-dash (U+2014), arrows, or other punctuation, extend the range:
+```cpp
+static const ImWchar ranges[] = {
+    0x0020, 0x00FF, // Basic Latin + Supplement
+    0x2000, 0x206F, // General Punctuation (em-dash, bullets, etc.)
+    0,              // terminator
+};
+ImFontConfig cfg;
+cfg.GlyphRanges = ranges;
+// Apply cfg to ALL AddFontFromFileTTF calls
+```
+
+**Font weight mapping (Inter example):**
+| .pen fontWeight | TTF file | Typical usage |
+|----------------|----------|--------------|
+| 400 (normal) | Inter-Regular.ttf | Body text, descriptions |
+| 500 (medium) | Inter-Medium.ttf | Button labels, badges |
+| 600 (semibold) | Inter-SemiBold.ttf | Card titles, nav labels, table headers |
+| 700 (bold) | Inter-Bold.ttf | Page titles, plan names |
+| 800 (extrabold) | Inter-ExtraBold.ttf | Price displays |
+
+### ImGui Icon Drawing via DrawList
+
+When icon fonts are unavailable, draw Lucide-style icons using `ImDrawList` primitives. This is resolution-independent and requires no font files.
+
+**Pattern:**
+```cpp
+typedef void (*IconDrawFn)(ImDrawList* dl, ImVec2 pos, float size, ImU32 col);
+
+// Inline icon that advances cursor:
+void Icon(IconDrawFn fn, float size, unsigned int colorHex) {
+    ImVec2 pos = GetCursorScreenPos();
+    fn(GetWindowDrawList(), pos, size, HexToU32(colorHex));
+    Dummy(ImVec2(size, size));
+}
+
+// Usage:
+Icon(DrawIconCreditCard, 22.0f, 0x6938EF);
+SameLine(0, 12.0f);
+Text("Current Plan");
+```
+
+**Common Lucide icons — DrawList recipes:**
+
+| Icon | Key shapes |
+|------|-----------|
+| credit-card | Rounded rect + horizontal line at 36% height + small filled rect |
+| wallet | Rounded rect + inner line at 30% + circle clasp at right |
+| receipt | Tall narrow rect + 4 horizontal lines evenly spaced |
+| triangle-alert | Triangle outline + vertical line (stem) + dot at bottom |
+| check-circle | Circle + two-segment checkmark polyline |
+| user | Circle (head at 30% y) + bezier arc (shoulders) |
+| shield | 6-point polygon approximating shield shape |
+| bell | Two bezier curves (body) + base line + small circle (clapper) |
+| layout-dashboard | 2x2 grid of rounded rects with gap |
+| building-2 | Outer rect + grid of small filled rects (windows) |
+| log-out | Half-rect (door frame) + arrow with chevron head |
+
+### ImGui space_between Pattern
+
+.pen `justifyContent: space_between` places first child at start, last at end.
+
+```cpp
+// Header row: title on left, badge/button on right
+CardHeader(DrawIconCreditCard, "Current Plan");  // left-aligned
+
+float rightW = 70.0f; // measure or estimate right content width
+SameLine(GetContentRegionAvail().x - rightW);    // jump to right edge
+Badge("Active", ...);                             // right-aligned
+```
+
+### ImGui Card Borders
+
+.pen `stroke: { align: "inside", fill: "#EAECF0", thickness: 1 }` maps to ImGui child borders:
+```cpp
+PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+PushStyleColor(ImGuiCol_Border, HexToColor(0xEAECF0));
+BeginChild("card", size, ImGuiChildFlags_Borders);
+```
+ImGui draws borders inside the child rect, matching `align: "inside"`.
+
+### ImGui Table Row Borders
+
+For exact border color control in tables, two approaches:
+
+**A) Built-in (simpler, less control):**
+```cpp
+PushStyleColor(ImGuiCol_TableBorderLight, HexToColor(0xEAECF0));
+BeginTable("t", cols, ImGuiTableFlags_BordersInnerH);
+```
+
+**B) Manual (exact color, per-row):**
+```cpp
+BeginTable("t", cols, ImGuiTableFlags_NoBordersInBody);
+for (row : rows) {
+    TableNextRow(0, 44.0f);
+    ImVec2 pos = GetCursorScreenPos();
+    GetWindowDrawList()->AddLine(pos, ImVec2(pos.x + tableW, pos.y), borderCol);
+    // ... cells ...
+}
+```
+
+### Design Extract Checklist for ImGui
+
+When extracting .pen designs for ImGui implementation, **always include**:
+
+- [ ] Layout tree with sizing mode (fixed px / fill_container / fit_content) and direction (h/v)
+- [ ] Padding as expanded `[top, right, bottom, left]` — not shorthand
+- [ ] Gap values between siblings
+- [ ] Which container scrolls (only one should)
+- [ ] All font instances as `(family, size, weight, color)` tuples
+- [ ] Icon names with family (lucide/feather/material), exact size, and color
+- [ ] Background vs foreground fill — state explicitly per node
+- [ ] Border with align (inside/center/outside), thickness, color
+- [ ] cornerRadius for every rounded element
+- [ ] Alignment — `justifyContent` and `alignItems` for **each** container
+- [ ] Exact text content including special characters (em-dash U+2014, etc.)
+- [ ] Component reuse patterns — which elements share the same structure

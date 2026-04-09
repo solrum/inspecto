@@ -1,6 +1,6 @@
 ---
 name: pen-design
-description: "Complete guide for .pen design format — understanding, parsing, and rendering .pen documents to native UI on any platform (Web, iOS, Android, Flutter). Use when working with .pen files, building renderers, implementing UI from .pen nodes, or debugging rendering issues."
+description: "Local Complete guide for .pen design format — understanding, parsing, and rendering .pen documents to native UI on any platform (Web, iOS, Android, Flutter). Use when working with .pen files, building renderers, implementing UI from .pen nodes, or debugging rendering issues."
 user-invocable: true
 ---
 
@@ -28,6 +28,8 @@ This skill gives you everything needed to understand, parse, and render `.pen` d
 - **"I'm debugging a rendering issue"** → Check `gotchas.md` first, then `visual-properties.md`
 - **"How do I handle layout?"** → Read `layout-and-sizing.md`
 - **"Show me real code"** → See `examples.md`
+- **"I'm implementing in ImGui (C++)"** → Read `platform-mapping.md` "ImGui Deep Dive" section + `gotchas.md` entries #14-23. Critical topics: padding strategies, scrollbar positioning, gap implementation, baseline alignment, icon drawing via DrawList.
+- **"I need to extract .pen design for native implementation"** → See "Design Extract Checklist" at the bottom of `platform-mapping.md` — ensures all info needed for implementation is captured.
 
 ## The One Rule You Must Never Forget
 

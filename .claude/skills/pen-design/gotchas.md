@@ -179,16 +179,19 @@ renderedNode.id = refNode.id  // "instance-1" — unique per instance
 ```
 for child in node.children:
   renderChild(child)  // Renders disabled nodes
+
+// Also BAD:
+if child.enabled == false: continue  // Fails when enabled = "$is-visible" (string)
 ```
 
 ### GOOD
 ```
 for child in node.children:
-  if child.enabled == false: continue  // Skip entirely
+  if resolveBoolean(child.enabled) == false: continue  // Resolve variable first!
   renderChild(child)
 ```
 
-`enabled: false` means the node doesn't exist — not rendered AND not in layout.
+`enabled` is `BooleanOrVariable` — it can be `"$flag"`. Always resolve through the variable resolver before checking. Same applies to `fill.enabled` and `effect.enabled`.
 
 ---
 
@@ -378,3 +381,141 @@ ImGui::Button("Fill", ImVec2(avail, 0));
 ```
 
 ImGui has no flex model. You must compute sizes manually for `fill_container`, `space_between`, etc.
+
+---
+
+## 19. ImGui: WindowPadding Unreliable for Page-Level Containers
+
+### BAD
+```cpp
+// Expecting WindowPadding to work on a large scrollable child
+PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(48, 32));
+BeginChild("##page", ImVec2(0, 0));
+  Text("This should be padded...");  // Padding may be 0!
+EndChild();
+PopStyleVar();
+```
+
+### GOOD
+```cpp
+// Use manual padding — deterministic and always correct
+BeginChild("##page", ImVec2(0, 0));
+  Dummy(ImVec2(0, 32));                    // top padding
+  SetCursorPosX(48);                        // left padding
+  BeginChild("##inner", ImVec2(contentW, 0), AutoResizeY);
+    Text("Correctly padded!");
+  EndChild();
+EndChild();
+```
+
+**Why:** `WindowPadding` is read from the style stack at `BeginChild` time. Parent push/pop order, global style resets, and nested children can cause it to silently resolve to `(0,0)`. Manual `Dummy` + `SetCursorPosX` is immune to this.
+
+---
+
+## 20. ImGui: Nested Children Create Extra Scrollbars
+
+### BAD
+```cpp
+// Inner padded child creates its own scrollbar inside the padding
+BeginChild("##outer", ImVec2(0, 0));          // scrollable
+  SetCursorPos(ImVec2(48, 32));
+  BeginChild("##inner", ImVec2(w, 0));        // ALSO scrollable!
+    RenderContent();                           // scrollbar appears at x=w, not viewport edge
+  EndChild();
+EndChild();
+```
+
+### GOOD
+```cpp
+// Only outer child scrolls. Inner children auto-resize (no scrollbar).
+BeginChild("##outer", ImVec2(0, 0));          // scrollable — scrollbar at right edge
+  Dummy(ImVec2(0, 32));                        // top padding
+  SetCursorPosX(48);
+  BeginChild("##card", ImVec2(contentW, 0), AutoResizeY);  // NOT scrollable
+    RenderContent();
+  EndChild();
+EndChild();
+```
+
+**Rule:** Scrollbar must be on the outermost content child only. All inner containers use `ImGuiChildFlags_AutoResizeY`.
+
+---
+
+## 21. ImGui: ItemSpacing Adds Hidden Gap to Dummy
+
+### BAD
+```cpp
+// ItemSpacing (default 8,4) adds extra space on top of Dummy
+RenderCard1();
+Dummy(ImVec2(0, 24));  // Actual gap = 24 + 4 (ItemSpacing.y) = 28px!
+RenderCard2();
+```
+
+### GOOD
+```cpp
+// Zero out ItemSpacing, use Dummy as sole gap source
+PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+RenderCard1();
+Dummy(ImVec2(0, 24));  // Exactly 24px
+RenderCard2();
+PopStyleVar();
+```
+
+**Rule:** When implementing .pen `gap`, always set `ItemSpacing` to `(0,0)` first, then `Dummy` gives the exact pixel gap.
+
+---
+
+## 22. ImGui: SameLine Doesn't Baseline-Align Different Font Sizes
+
+### BAD
+```cpp
+PushFont(fontPrice);    // 36px
+Text("$12");
+PopFont();
+SameLine(0, 4);
+Text("/ month");        // 14px — aligned to TOP of "$12", not baseline
+```
+
+### GOOD
+```cpp
+// Use DrawList for precise baseline alignment
+ImVec2 pos = GetCursorScreenPos();
+PushFont(fontPrice);
+ImVec2 bigSz = CalcTextSize("$12");
+GetWindowDrawList()->AddText(fontPrice, fontPrice->FontSize, pos, col, "$12");
+PopFont();
+
+PushFont(fontBody);
+ImVec2 smSz = CalcTextSize("/ month");
+float baseline = pos.y + bigSz.y - smSz.y - 2.0f;
+GetWindowDrawList()->AddText(fontBody, fontBody->FontSize,
+    ImVec2(pos.x + bigSz.x + 6, baseline), col2, "/ month");
+PopFont();
+
+Dummy(ImVec2(bigSz.x + 6 + smSz.x, bigSz.y));
+```
+
+---
+
+## 23. ImGui: Sidebar/Content Gap — No Border ≠ No Separation
+
+### BAD
+```cpp
+// Adding a visible border or gap between sidebar and content
+RenderSidebar();
+SameLine(0, 8);         // gap — not in design
+RenderContent();
+// OR: adding border to sidebar child — also wrong if design has none
+```
+
+### GOOD
+```cpp
+// Design uses background color contrast, not borders/gaps
+// Sidebar: white (#FFFFFF), Content: light gray (#F9FAFB)
+RenderSidebar();         // ChildBg = white, ChildBorderSize = 0
+SameLine(0, 0);          // zero gap — color contrast provides separation
+RenderContent();         // ChildBg = #F9FAFB
+// Content's own left padding (e.g. 48px) creates visual breathing room
+```
+
+**Rule:** Always check the design extract for explicit borders/gaps. If sidebar has no `stroke` property and content has internal `padding`, the separation is purely from background color contrast + content padding.

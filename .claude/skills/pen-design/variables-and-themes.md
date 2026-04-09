@@ -21,6 +21,17 @@ Defined in `document.variables`:
 
 Types: `color`, `number`, `string`, `boolean`.
 
+### Variable-Bindable Property Types
+
+| Type Alias | Accepts | Properties |
+|---|---|---|
+| `ColorOrVariable` | `"#hex"` or `"$var"` | `fill.color`, `stroke.fill`, `effect.color` |
+| `NumberOrVariable` | `42` or `"$var"` | `fontSize`, `gap`, `padding`, `opacity`, `rotation`, `blur`, `spread`, `offset.x/y`, `thickness`, `cornerRadius` |
+| `StringOrVariable` | `"literal"` or `"$var"` | `fontFamily`, `fontWeight`, `fontStyle`, `iconFontName`, `iconFontFamily` |
+| `BooleanOrVariable` | `true`/`false` or `"$var"` | `enabled` (on nodes, fills, effects), `clip`, `flipX`, `flipY`, `underline`, `strikethrough` |
+
+**Important:** `BooleanOrVariable` means you CANNOT use `if (node.enabled === false)` — you must resolve through the variable resolver first: `resolveBoolean(node.enabled) === false`.
+
 ## Themed Variables (Multi-Axis)
 
 Variables can have different values per theme combination:
@@ -36,6 +47,19 @@ Variables can have different values per theme combination:
     ]
   }
 }
+```
+
+### Theme Initialization
+
+**Critical:** The renderer MUST initialize `activeTheme` with defaults from `document.themes`. If `activeTheme = {}`, NO themed entry will match.
+
+```
+initTheme(docThemes):
+  activeTheme = {}
+  for (axis, values) in docThemes:
+    activeTheme[axis] = values[0]  // first value = default
+  return activeTheme
+// e.g. { "mode": ["light", "dark"] } → { mode: "light" }
 ```
 
 ### Resolution Rules

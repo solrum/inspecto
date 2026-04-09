@@ -31,7 +31,15 @@ function buildRegistry(children):
 
 Instantiate with `document.variables` + active theme (user-selected axis values).
 
-The resolver provides: `resolveColor(val)`, `resolveNumber(val)`, `resolveString(val)`, `resolvePadding(val)`, `resolveCornerRadius(val)`.
+The resolver provides:
+- `resolveColor(val)` — `ColorOrVariable` → hex string
+- `resolveNumber(val)` — `NumberOrVariable` → number
+- `resolveString(val)` — `StringOrVariable` → string
+- `resolveBoolean(val)` — `BooleanOrVariable` → boolean (for `enabled`, `clip`, `flipX`, `flipY`, `underline`, `strikethrough`, fill/effect `enabled` flags)
+- `resolvePadding(val)` — `PenPadding` → `[t, r, b, l]`
+- `resolveCornerRadius(val)` — `PenCornerRadius` → number or number[]
+
+**Theme default initialization:** When `activeTheme` is empty (`{}`), themed variable entries will NOT match. Renderers MUST initialize `activeTheme` with the first value of each axis from `document.themes` (e.g. `{ mode: "light" }`).
 
 ## Step 3: Parse to IRenderNode
 
@@ -53,13 +61,18 @@ The resolver provides: `resolveColor(val)`, `resolveNumber(val)`, `resolveString
 2. Resolve size (fixed / fill_container / fit_content)
 3. Resolve visual properties (fill → background OR foreground, stroke, corners, effects)
 4. For containers: recursively parse children, passing own layout as parent context
-5. Skip children with `enabled: false`
+5. Skip children with `resolveBoolean(enabled) === false` (NOT truthy check — `enabled` can be a `$variable`)
+6. Resolve `rotation`/`flipX`/`flipY` → `transform` CSS string
+7. Resolve `opacity` via `resolveNumber` (ALL node types including group)
 
 ### RefParser Special Logic
 
 1. Lookup `ref` ID in component registry
-2. Clone component, apply overrides from ref node
-3. Re-parse as the component's actual type (e.g., `frame`)
+2. **Deep clone** component (not shallow — prevents mutating the registry)
+3. Apply root overrides from ref node (skip: `id`, `type`, `ref`, `descendants`, `reusable`, `x`, `y`, `layoutPosition`)
+4. Apply `descendants` overrides: walk cloned children tree, find nodes by ID, merge property overrides
+5. Set `id` = ref node's ID (unique per instance)
+6. Re-parse merged node as the component's actual type (e.g., `frame`)
 
 ## IRenderNode — Abstract Intermediate
 
@@ -97,8 +110,9 @@ IRenderNode {
   border?, borderTop?, borderRight?, borderBottom?, borderLeft?
   boxShadow?, outline?
 
-  // Effects
+  // Effects & Transform
   opacity?, filter?, backdropFilter?
+  transform?                   // "rotate(45deg) scaleX(-1)" etc.
 
   // Text (foreground props)
   color?, fontFamily?, fontSize?, fontWeight?, fontStyle?
